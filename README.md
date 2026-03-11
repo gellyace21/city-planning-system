@@ -1,3 +1,3 @@
-# CITY PLANNING SYSTEM - Monitoring
+# CITY PLANNING MONITORING SYSTEM
 
-A project initiated by the CPDO for OJT purposes.
+System initiated for OJT.
