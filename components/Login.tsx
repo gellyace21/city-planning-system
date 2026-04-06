@@ -1,24 +1,47 @@
 "use client";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+useRouter;
 
 export default function Login(): React.JSX.Element {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await signIn("credentials", {
-      redirect: false,
-      email,
-      password,
-    });
-    if (res?.error) {
-      setError("Invalid credentials");
-    } else {
-      // Redirect or reload as needed
-      window.location.href = "/dashboard"; // or your protected route
+    if (loading) return;
+
+    setError("");
+    setLoading(true);
+
+    try {
+      const res = await signIn("credentials", {
+        redirect: false,
+        email,
+        password,
+      });
+
+      if (res?.error) {
+        setError("Invalid credentials");
+        return;
+      }
+
+      const session = await getSession();
+      const role = session?.user?.role;
+
+      if (role === "superadmin") {
+        router.replace("/dashboard/superadmin");
+      } else if (role === "admin") {
+        router.replace("/dashboard");
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
