@@ -14,7 +14,7 @@ const Navbar = () => {
 
   return (
     <header className="w-full h-21 z-50 fixed top-0 left-0">
-      <nav className="h-full w-full flex items-center justify-between bg-(--primary) ">
+      <nav className="h-full w-full flex items-center justify-between bg-primary ">
         <div className="flex items-center">
           <img
             className="self-center ml-4"
@@ -34,17 +34,17 @@ const Navbar = () => {
           <div className="flex items-end gap-4 h-full">
             <ul className="flex items-end h-8 gap-4 [&>li]:pb-4 [&>li]:pt-1 [&>li]:px-4 [&>li]:rounded-sm [&>li]:rounded-b-none">
               <li
-                className={`h-full ${pathname === "/project-monitoring" ? "bg-[var(--background)] text-black" : "text-white"}`}
+                className={`h-full ${pathname === "/project-monitoring" ? "bg-background text-black" : "text-white"}`}
               >
                 <a href="/project-monitoring">Project Monitoring</a>
               </li>
               <li
-                className={`h-full ${pathname === "/annual-investment-plan" ? "bg-[var(--background)] text-black" : "text-white"}`}
+                className={`h-full ${pathname === "/annual-investment-plan" ? "bg-background text-black" : "text-white"}`}
               >
                 <a href="/annual-investment-plan">Annual Investment</a>
               </li>
               <li
-                className={`h-full ${pathname === "/" ? "bg-[var(--background)] text-black" : "text-white"}`}
+                className={`h-full ${pathname === "/" ? "bg-background text-black" : "text-white"}`}
               >
                 <a href="/">Home</a>
               </li>

@@ -1,6 +1,58 @@
 "use client";
 
+import { useState } from "react";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
+
 export default function Register(): React.JSX.Element {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [department, setDepartment] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, department }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data?.error || "Registration failed");
+        return;
+      }
+      setSuccess(true);
+
+      // Optional: auto-login right after register
+      // const login = await signIn("credentials", {
+      //   redirect: false,
+      //   email: email, // your auth checks lead username in "email" field
+      //   password,
+      // });
+
+      // if (login?.error) {
+      //   router.push("/login");
+      //   return;
+      // }
+
+      // router.push("/dashboard");
+    } catch {
+      setError("Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="fp2-root">
       <main className="fp2-main">
@@ -17,17 +69,19 @@ export default function Register(): React.JSX.Element {
             <h2 className="welcome-title">Welcome!</h2>
             <p className="welcome-sub">Please login to continue</p>
 
-            <form action="#" method="get" className="login-form">
+            <form onSubmit={handleRegister} method="get" className="login-form">
               <div className="form-group">
                 <input
+                  onChange={(e) => setEmail(e.target.value)}
                   type="text"
-                  name="username"
+                  name="email"
                   placeholder="Username or Email"
                   required
                 />
               </div>
               <div className="form-group">
                 <input
+                  onChange={(e) => setPassword(e.target.value)}
                   type="password"
                   name="password"
                   placeholder="Password"
@@ -38,7 +92,12 @@ export default function Register(): React.JSX.Element {
                 Register
               </button>
             </form>
-
+            {error ? <p className="text-red-400">{error}</p> : null}
+            {success ? (
+              <p className="text-green-400">
+                Sign-up successful. Please <a href="/login">login</a>.
+              </p>
+            ) : null}
             <p className="register-link">
               Already have an account? <a href="/login">Login</a>
             </p>

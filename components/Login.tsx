@@ -1,6 +1,27 @@
 "use client";
+import { signIn } from "next-auth/react";
+import { useState } from "react";
 
 export default function Login(): React.JSX.Element {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const res = await signIn("credentials", {
+      redirect: false,
+      email,
+      password,
+    });
+    if (res?.error) {
+      setError("Invalid credentials");
+    } else {
+      // Redirect or reload as needed
+      window.location.href = "/dashboard"; // or your protected route
+    }
+  };
+
   return (
     <div className="fp2-root">
       <main className="fp2-main">
@@ -16,17 +37,19 @@ export default function Login(): React.JSX.Element {
           <h2 className="welcome-title">Welcome!</h2>
           <p className="welcome-sub">Please login to continue</p>
 
-          <form action="#" method="get" className="login-form">
+          <form onSubmit={handleSubmit} className="login-form">
             <div className="form-group">
               <input
+                onChange={(e) => setEmail(e.target.value)}
                 type="text"
-                name="username"
-                placeholder="Username or Email"
+                name="email"
+                placeholder="Email"
                 required
               />
             </div>
             <div className="form-group">
               <input
+                onChange={(e) => setPassword(e.target.value)}
                 type="password"
                 name="password"
                 placeholder="Password"
@@ -37,7 +60,7 @@ export default function Login(): React.JSX.Element {
               Login
             </button>
           </form>
-
+          {error !== "" ? <p className="text-red-400">{error}</p> : null}
           <p className="register-link">
             No account yet? <a href="/register">Register</a>
           </p>
