@@ -145,6 +145,24 @@ const DUMMY_DATA: AIPRow[] = [
   },
 ];
 
+const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
+  checkbox: 40,
+  aipCode: 100,
+  description: 280,
+  department: 180,
+  schedule: 120,
+  outputs: 180,
+  funding: 120,
+  ps: 150,
+  mooe: 180,
+  fe: 140,
+  co: 140,
+  total: 100,
+  ccAdaptation: 150,
+  ccMitigation: 150,
+  ccCode: 80,
+};
+
 const MOCK_USER: AIPUser = {
   id: "user-001",
   name: "John Patrick Salen",
@@ -191,6 +209,13 @@ export default function AIPDashboard(): React.JSX.Element {
   const [highlighted, setHighlighted] = useState<EditCell>(null);
   const [theadHeight, setTheadHeight] = useState<number>(89);
   const [trHeight, setTrHeight] = useState<number>(56);
+  const [expandedColumns, setExpandedColumns] = useState<boolean>(false);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(
+    DEFAULT_COLUMN_WIDTHS,
+  );
+  const [resizing, setResizing] = useState<string | null>(null);
+  const [startX, setStartX] = useState<number>(0);
+  const [startWidth, setStartWidth] = useState<number>(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const theadRef = useRef<HTMLTableSectionElement>(null);
   const tbodyRef = useRef<HTMLTableSectionElement>(null);
@@ -223,6 +248,58 @@ export default function AIPDashboard(): React.JSX.Element {
     );
     setHighlighted({ rowId, field });
     setTimeout(() => setHighlighted(null), 1500);
+  };
+
+  const startResize = (columnId: string, e: React.MouseEvent): void => {
+    e.preventDefault();
+    const th = (e.target as HTMLElement).closest("th");
+    if (!th) return;
+    setResizing(columnId);
+    setStartX(e.pageX);
+    setStartWidth(th.offsetWidth);
+  };
+
+  const handleMouseMove = useCallback(
+    (e: MouseEvent): void => {
+      if (!resizing) return;
+      const diff = e.pageX - startX;
+      const newWidth = Math.max(60, startWidth + diff);
+      setColumnWidths((prev) => ({ ...prev, [resizing]: newWidth }));
+    },
+    [resizing, startX, startWidth],
+  );
+
+  const handleMouseUp = useCallback((): void => {
+    setResizing(null);
+  }, []);
+
+  useEffect(() => {
+    if (resizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      return () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
+    }
+  }, [resizing, handleMouseMove, handleMouseUp]);
+
+  const getColumnWidth = (columnId: string): number => {
+    return columnWidths[columnId];
+  };
+
+  const shouldShowFullName = (columnId: string): boolean => {
+    const width = columnWidths[columnId];
+    const thresholds: Record<string, number> = {
+      ps: 130,
+      mooe: 150,
+      fe: 120,
+      co: 120,
+      ccAdaptation: 130,
+      ccMitigation: 130,
+    };
+    const threshold = thresholds[columnId];
+    return expandedColumns || (threshold !== undefined && width >= threshold);
   };
 
   const allSectors: string[] = [
@@ -522,12 +599,27 @@ export default function AIPDashboard(): React.JSX.Element {
     );
   };
 
+  const ResizeHandle = ({
+    columnId,
+  }: {
+    columnId: string;
+  }): React.JSX.Element => (
+    <div
+      onMouseDown={(e) => startResize(columnId, e)}
+      className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-teal-400 group z-10"
+      style={{ userSelect: "none" }}
+    >
+      <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-gray-300 group-hover:bg-teal-500 group-hover:w-1" />
+    </div>
+  );
+
   return (
     <div
       className="min-h-screen bg-teal-50"
       style={{
         fontFamily: "'DM Sans','Segoe UI',sans-serif",
         paddingRight: showHistory ? "320px" : undefined,
+        userSelect: resizing ? "none" : "auto",
       }}
     >
       <div className="max-w-screen-2xl mx-auto px-6 py-6 space-y-5">
@@ -541,6 +633,17 @@ export default function AIPDashboard(): React.JSX.Element {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setExpandedColumns((v) => !v)}
+              className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 text-xs font-semibold hover:bg-gray-50"
+              title={
+                expandedColumns
+                  ? "Show abbreviated columns"
+                  : "Show full column names"
+              }
+            >
+              {expandedColumns ? "⇄ Collapse" : "⇆ Expand"}
+            </button>
             <button
               onClick={() => setShowHistory((v) => !v)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${showHistory ? "bg-teal-600 text-white border-teal-600" : "bg-white text-teal-700 border-teal-200 hover:bg-teal-50"}`}
@@ -738,221 +841,291 @@ export default function AIPDashboard(): React.JSX.Element {
 
             <div className="flex-1 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[1180px]">
-                <thead ref={theadRef}>
-                  <tr className="bg-teal-50 border-b border-teal-200 text-teal-700">
-                    <th className="w-10 px-3 py-3">
-                      <input
-                        type="checkbox"
-                        className="rounded"
-                        checked={
-                          selectedRows.size === filtered.length &&
-                          filtered.length > 0
-                        }
-                        onChange={toggleAll}
-                      />
-                    </th>
-                    <th
-                      className="px-3 py-3 text-left text-xs font-bold uppercase cursor-pointer"
-                      onClick={() => handleSort("aipCode")}
-                    >
-                      AIP Code
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-bold uppercase">
-                      Description
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-bold uppercase">
-                      Department
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-bold uppercase">
-                      Schedule
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-bold uppercase">
-                      Outputs
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-bold uppercase">
-                      Funding
-                    </th>
-                    <th className="px-3 py-3 text-right text-xs font-bold uppercase">
-                      PS
-                    </th>
-                    <th className="px-3 py-3 text-right text-xs font-bold uppercase">
-                      MOOE
-                    </th>
-                    <th className="px-3 py-3 text-right text-xs font-bold uppercase">
-                      FE
-                    </th>
-                    <th className="px-3 py-3 text-right text-xs font-bold uppercase">
-                      CO
-                    </th>
-                    <th className="px-3 py-3 text-right text-xs font-bold uppercase">
-                      Total
-                    </th>
-                    <th className="px-3 py-3 text-right text-xs font-bold uppercase">
-                      CC Adapt
-                    </th>
-                    <th className="px-3 py-3 text-right text-xs font-bold uppercase">
-                      CC Mit
-                    </th>
-                    <th className="px-3 py-3 text-center text-xs font-bold uppercase">
-                      CC Code
-                    </th>
-                  </tr>
-                </thead>
-                <tbody ref={tbodyRef}>
-                  {filtered.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={15}
-                        className="text-center py-16 text-gray-400"
+                <table
+                  className="text-sm"
+                  style={{ minWidth: "100%", width: "max-content" }}
+                >
+                  <thead ref={theadRef}>
+                    <tr className="bg-teal-50 border-b border-teal-200 text-teal-700">
+                      <th
+                        className="px-3 py-3 relative text-center"
+                        style={{ width: getColumnWidth("checkbox") }}
                       >
-                        No records found.
-                      </td>
+                        <input
+                          type="checkbox"
+                          className="rounded"
+                          checked={
+                            selectedRows.size === filtered.length &&
+                            filtered.length > 0
+                          }
+                          onChange={toggleAll}
+                        />
+                      </th>
+                      <th
+                        className="px-3 py-3 text-center text-xs font-bold uppercase cursor-pointer relative"
+                        onClick={() => handleSort("aipCode")}
+                        style={{ width: getColumnWidth("aipCode") }}
+                      >
+                        AIP Code
+                        <ResizeHandle columnId="aipCode" />
+                      </th>
+                      <th
+                        className="px-3 py-3 text-center text-xs font-bold uppercase relative"
+                        style={{ width: getColumnWidth("description") }}
+                      >
+                        Description
+                        <ResizeHandle columnId="description" />
+                      </th>
+                      <th
+                        className="px-3 py-3 text-center text-xs font-bold uppercase relative"
+                        style={{ width: getColumnWidth("department") }}
+                      >
+                        Department
+                        <ResizeHandle columnId="department" />
+                      </th>
+                      <th
+                        className="px-3 py-3 text-center text-xs font-bold uppercase relative"
+                        style={{ width: getColumnWidth("schedule") }}
+                      >
+                        Schedule
+                        <ResizeHandle columnId="schedule" />
+                      </th>
+                      <th
+                        className="px-3 py-3 text-center text-xs font-bold uppercase relative"
+                        style={{ width: getColumnWidth("outputs") }}
+                      >
+                        Outputs
+                        <ResizeHandle columnId="outputs" />
+                      </th>
+                      <th
+                        className="px-3 py-3 text-center text-xs font-bold uppercase relative"
+                        style={{ width: getColumnWidth("funding") }}
+                      >
+                        Funding
+                        <ResizeHandle columnId="funding" />
+                      </th>
+                      <th
+                        className="px-3 py-3 text-center text-xs font-bold uppercase whitespace-nowrap relative"
+                        style={{ width: getColumnWidth("ps") }}
+                      >
+                        {shouldShowFullName("ps") ? "Personal Services" : "PS"}
+                        <ResizeHandle columnId="ps" />
+                      </th>
+                      <th
+                        className="px-3 py-3 text-center text-xs font-bold uppercase whitespace-nowrap relative"
+                        style={{ width: getColumnWidth("mooe") }}
+                      >
+                        {shouldShowFullName("mooe")
+                          ? "Maintenance & OOE"
+                          : "MOOE"}
+                        <ResizeHandle columnId="mooe" />
+                      </th>
+                      <th
+                        className="px-3 py-3 text-center text-xs font-bold uppercase whitespace-nowrap relative"
+                        style={{ width: getColumnWidth("fe") }}
+                      >
+                        {shouldShowFullName("fe") ? "Financial Exp" : "FE"}
+                        <ResizeHandle columnId="fe" />
+                      </th>
+                      <th
+                        className="px-3 py-3 text-center text-xs font-bold uppercase whitespace-nowrap relative"
+                        style={{ width: getColumnWidth("co") }}
+                      >
+                        {shouldShowFullName("co") ? "Capital Outlay" : "CO"}
+                        <ResizeHandle columnId="co" />
+                      </th>
+                      <th
+                        className="px-3 py-3 text-center text-xs font-bold uppercase whitespace-nowrap relative"
+                        style={{ width: getColumnWidth("total") }}
+                      >
+                        Total
+                        <ResizeHandle columnId="total" />
+                      </th>
+                      <th
+                        className="px-3 py-3 text-center text-xs font-bold uppercase whitespace-nowrap relative"
+                        style={{ width: getColumnWidth("ccAdaptation") }}
+                      >
+                        {shouldShowFullName("ccAdaptation")
+                          ? "CC Adaptation"
+                          : "CC Adapt"}
+                        <ResizeHandle columnId="ccAdaptation" />
+                      </th>
+                      <th
+                        className="px-3 py-3 text-center text-xs font-bold uppercase whitespace-nowrap relative"
+                        style={{ width: getColumnWidth("ccMitigation") }}
+                      >
+                        {shouldShowFullName("ccMitigation")
+                          ? "CC Mitigation"
+                          : "CC Mit"}
+                        <ResizeHandle columnId="ccMitigation" />
+                      </th>
+                      <th
+                        className="px-3 py-3 text-center text-xs font-bold uppercase relative"
+                        style={{ width: getColumnWidth("ccCode") }}
+                      >
+                        CC Code
+                        <ResizeHandle columnId="ccCode" />
+                      </th>
                     </tr>
-                  )}
-                  {filtered.map((row, i) => {
-                    const isSelected = selectedRows.has(row.id);
-                    const rowBg = isSelected
-                      ? "bg-teal-50"
-                      : i % 2 === 0
-                        ? "bg-white"
-                        : "bg-gray-50/60";
-                    return (
-                      <tr
-                        key={row.id}
-                        className={`border-b border-gray-100 ${rowBg}`}
-                      >
-                        <td className="px-3 py-2 text-center">
-                          <input
-                            type="checkbox"
-                            className="rounded"
-                            checked={isSelected}
-                            onChange={() => toggleRow(row.id)}
-                          />
+                  </thead>
+                  <tbody ref={tbodyRef}>
+                    {filtered.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={15}
+                          className="text-center py-16 text-gray-400"
+                        >
+                          No records found.
                         </td>
-                        <EditableCell
-                          row={row}
-                          field="aipCode"
-                          className="px-3 py-2 font-mono text-xs font-bold text-teal-700 whitespace-nowrap"
-                        />
-                        <EditableCell
-                          row={row}
-                          field="description"
-                          className="px-3 py-2 text-gray-800"
-                        />
-                        <EditableCell
-                          row={row}
-                          field="department"
-                          className="px-3 py-2 text-gray-600 text-xs"
-                        />
-                        <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
-                          <div className="flex flex-col gap-0.5">
-                            {editCell?.rowId === row.id &&
-                            editCell?.field === "startDate" ? (
-                              <input
-                                autoFocus
-                                type="text"
-                                value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
-                                onBlur={commitEdit}
-                                onKeyDown={handleKeyDown}
-                                className="w-20 text-xs border border-teal-400 rounded px-1 py-0.5 bg-teal-50"
-                              />
-                            ) : (
-                              <span
-                                onDoubleClick={() =>
-                                  startEdit(row.id, "startDate", row.startDate)
-                                }
-                              >
-                                {row.startDate || "start"}
-                              </span>
-                            )}
-                            {editCell?.rowId === row.id &&
-                            editCell?.field === "endDate" ? (
-                              <input
-                                autoFocus
-                                type="text"
-                                value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
-                                onBlur={commitEdit}
-                                onKeyDown={handleKeyDown}
-                                className="w-20 text-xs border border-teal-400 rounded px-1 py-0.5 bg-teal-50"
-                              />
-                            ) : (
-                              <span
-                                onDoubleClick={() =>
-                                  startEdit(row.id, "endDate", row.endDate)
-                                }
-                              >
-                                -&gt; {row.endDate || "end"}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <EditableCell
-                          row={row}
-                          field="outputs"
-                          className="px-3 py-2 text-xs text-gray-600"
-                        />
-                        <EditableCell
-                          row={row}
-                          field="funding"
-                          className="px-3 py-2 text-xs text-gray-600"
-                        />
-                        <EditableCell
-                          row={row}
-                          field="ps"
-                          className="px-3 py-2 text-right text-xs"
-                          numeric
-                        />
-                        <EditableCell
-                          row={row}
-                          field="mooe"
-                          className="px-3 py-2 text-right text-xs"
-                          numeric
-                        />
-                        <EditableCell
-                          row={row}
-                          field="fe"
-                          className="px-3 py-2 text-right text-xs"
-                          numeric
-                        />
-                        <EditableCell
-                          row={row}
-                          field="co"
-                          className="px-3 py-2 text-right text-xs"
-                          numeric
-                        />
-                        <EditableCell
-                          row={row}
-                          field="total"
-                          className="px-3 py-2 text-right text-xs bg-teal-50/40"
-                          readOnly
-                        />
-                        <EditableCell
-                          row={row}
-                          field="ccAdaptation"
-                          className="px-3 py-2 text-right text-xs"
-                          numeric
-                        />
-                        <EditableCell
-                          row={row}
-                          field="ccMitigation"
-                          className="px-3 py-2 text-right text-xs"
-                          numeric
-                        />
-                        <EditableCell
-                          row={row}
-                          field="ccCode"
-                          className="px-3 py-2 text-center text-xs"
-                        />
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    )}
+                    {filtered.map((row, i) => {
+                      const isSelected = selectedRows.has(row.id);
+                      const rowBg = isSelected
+                        ? "bg-teal-50"
+                        : i % 2 === 0
+                          ? "bg-white"
+                          : "bg-gray-50/60";
+                      return (
+                        <tr
+                          key={row.id}
+                          className={`border-b border-gray-100 ${rowBg}`}
+                        >
+                          <td className="px-3 py-2 text-center">
+                            <input
+                              type="checkbox"
+                              className="rounded"
+                              checked={isSelected}
+                              onChange={() => toggleRow(row.id)}
+                            />
+                          </td>
+                          <EditableCell
+                            row={row}
+                            field="aipCode"
+                            className="px-3 py-2 font-mono text-xs font-bold text-teal-700 whitespace-nowrap"
+                          />
+                          <EditableCell
+                            row={row}
+                            field="description"
+                            className="px-3 py-2 text-gray-800"
+                          />
+                          <EditableCell
+                            row={row}
+                            field="department"
+                            className="px-3 py-2 text-gray-600 text-xs"
+                          />
+                          <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                            <div className="flex flex-col gap-0.5">
+                              {editCell?.rowId === row.id &&
+                              editCell?.field === "startDate" ? (
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  onBlur={commitEdit}
+                                  onKeyDown={handleKeyDown}
+                                  className="w-20 text-xs border border-teal-400 rounded px-1 py-0.5 bg-teal-50"
+                                />
+                              ) : (
+                                <span
+                                  onDoubleClick={() =>
+                                    startEdit(
+                                      row.id,
+                                      "startDate",
+                                      row.startDate,
+                                    )
+                                  }
+                                >
+                                  {row.startDate || "start"}
+                                </span>
+                              )}
+                              {editCell?.rowId === row.id &&
+                              editCell?.field === "endDate" ? (
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  onBlur={commitEdit}
+                                  onKeyDown={handleKeyDown}
+                                  className="w-20 text-xs border border-teal-400 rounded px-1 py-0.5 bg-teal-50"
+                                />
+                              ) : (
+                                <span
+                                  onDoubleClick={() =>
+                                    startEdit(row.id, "endDate", row.endDate)
+                                  }
+                                >
+                                  -&gt; {row.endDate || "end"}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <EditableCell
+                            row={row}
+                            field="outputs"
+                            className="px-3 py-2 text-xs text-gray-600"
+                          />
+                          <EditableCell
+                            row={row}
+                            field="funding"
+                            className="px-3 py-2 text-xs text-gray-600"
+                          />
+                          <EditableCell
+                            row={row}
+                            field="ps"
+                            className="px-3 py-2 text-right text-xs"
+                            numeric
+                          />
+                          <EditableCell
+                            row={row}
+                            field="mooe"
+                            className="px-3 py-2 text-right text-xs"
+                            numeric
+                          />
+                          <EditableCell
+                            row={row}
+                            field="fe"
+                            className="px-3 py-2 text-right text-xs"
+                            numeric
+                          />
+                          <EditableCell
+                            row={row}
+                            field="co"
+                            className="px-3 py-2 text-right text-xs"
+                            numeric
+                          />
+                          <EditableCell
+                            row={row}
+                            field="total"
+                            className="px-3 py-2 text-right text-xs bg-teal-50/40"
+                            readOnly
+                          />
+                          <EditableCell
+                            row={row}
+                            field="ccAdaptation"
+                            className="px-3 py-2 text-right text-xs"
+                            numeric
+                          />
+                          <EditableCell
+                            row={row}
+                            field="ccMitigation"
+                            className="px-3 py-2 text-right text-xs"
+                            numeric
+                          />
+                          <EditableCell
+                            row={row}
+                            field="ccCode"
+                            className="px-3 py-2 text-center text-xs"
+                          />
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
           </div>
         )}
 

@@ -22,7 +22,9 @@ interface SectorPillColumnProps {
   setEditValue: (value: string) => void;
   startEdit: (rowId: number, field: "sector", currentVal: string) => void;
   commitEdit: () => void;
-  handleKeyDown: (e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => void;
+  handleKeyDown: (
+    e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => void;
 }
 
 export default function SectorPillColumn({
@@ -40,7 +42,10 @@ export default function SectorPillColumn({
   handleKeyDown,
 }: SectorPillColumnProps): React.JSX.Element {
   return (
-    <div className="flex-none flex flex-col" style={{ paddingTop: `${theadHeight}px` }}>
+    <div
+      className="flex-none flex flex-col"
+      style={{ paddingTop: `${theadHeight}px` }}
+    >
       {filtered.map((row) => {
         const pillBg = sectorPills[row.sector] ?? sectorPillFallback;
 

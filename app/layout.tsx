@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter, Merriweather } from "next/font/google";
+import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "@/app/globals.css";
-import Footer from "../../components/layout/footer";
-import Nav from "../../components/layout/navbar";
+import Footer from "../components/layout/footer";
+import Nav from "../components/layout/navbar";
 import { cn } from "@/lib/utils";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
