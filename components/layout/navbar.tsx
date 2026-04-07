@@ -34,14 +34,16 @@ const Navbar = () => {
           <div className="flex items-end gap-4 h-full">
             <ul className="flex items-end h-8 gap-4 [&>li]:pb-4 [&>li]:pt-1 [&>li]:px-4 [&>li]:rounded-sm [&>li]:rounded-b-none">
               <li
-                className={`h-full ${pathname === "/project-monitoring" ? "bg-background text-black" : "text-white"}`}
+                className={`h-full ${pathname === "/dashboard/project-monitoring" ? "bg-background text-black" : "text-white"}`}
               >
-                <a href="/project-monitoring">Project Monitoring</a>
+                <a href="/dashboard/project-monitoring">Project Monitoring</a>
               </li>
               <li
-                className={`h-full ${pathname === "/annual-investment-plan" ? "bg-background text-black" : "text-white"}`}
+                className={`h-full ${pathname === "/dashboard/annual-investment-plan" ? "bg-background text-black" : "text-white"}`}
               >
-                <a href="/annual-investment-plan">Annual Investment</a>
+                <a href="/dashboard/annual-investment-plan">
+                  Annual Investment
+                </a>
               </li>
               <li
                 className={`h-full ${pathname === "/" ? "bg-background text-black" : "text-white"}`}

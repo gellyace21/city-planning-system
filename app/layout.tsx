@@ -33,8 +33,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased `}
       >
         <Nav />
-
-        {children}
+        <main className="flex min-h-screen flex-col items-center justify-start gap-12 relative p-24">
+          {children}
+        </main>
         <Footer />
       </body>
     </html>
