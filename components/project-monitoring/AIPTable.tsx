@@ -81,7 +81,7 @@ export default function AIPTable({
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={commitEdit}
             onKeyDown={handleKeyDown}
-            className="w-full min-w-[60px] text-xs border border-sky-400 rounded px-1.5 py-0.5 bg-sky-50 focus:outline-none focus:ring-1 focus:ring-sky-500"
+            className="w-full min-w-0 text-[11px] border border-sky-400 rounded px-1 py-0.5 bg-sky-50 focus:outline-none focus:ring-1 focus:ring-sky-500"
           />
         </td>
       );
@@ -104,24 +104,28 @@ export default function AIPTable({
     );
   };
 
-  const SortIcon: FC<{ col: SortKey }> = ({ col }) =>
+  const renderSortIcon = (col: SortKey): React.JSX.Element =>
     sortCol === col ? (
       <span className="ml-1 text-sky-500">{sortDir === "asc" ? "↑" : "↓"}</span>
     ) : (
       <span className="ml-1 text-gray-300">↕</span>
     );
 
-  const Th: FC<{ col: SortKey; label: string; cls?: string }> = ({
+  const renderTh = ({
     col,
     label,
     cls = "",
-  }) => (
+  }: {
+    col: SortKey;
+    label: string;
+    cls?: string;
+  }): React.JSX.Element => (
     <th
-      className={`px-3 py-3 text-left text-xs font-bold uppercase tracking-wider select-none whitespace-nowrap transition-colors ${col ? "cursor-pointer hover:bg-sky-50" : ""} ${cls}`}
+      className={`px-1.5 py-2 text-left text-[10px] font-bold uppercase tracking-tight select-none whitespace-normal wrap-break-word transition-colors ${col ? "cursor-pointer hover:bg-sky-50" : ""} ${cls}`}
       onClick={() => col && handleSort(col)}
     >
       {label}
-      {col && <SortIcon col={col} />}
+      {col && renderSortIcon(col)}
     </th>
   );
 
@@ -142,11 +146,29 @@ export default function AIPTable({
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse min-w-[1400px]">
+      <div className="overflow-x-hidden">
+        <table className="w-full table-fixed text-[11px] border-collapse [&_th]:align-top [&_td]:align-top [&_td]:wrap-break-word [&_td]:whitespace-normal">
+          <colgroup>
+            <col style={{ width: "2%" }} />
+            <col style={{ width: "6%" }} />
+            <col style={{ width: "18%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "12%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "4%" }} />
+            <col style={{ width: "4%" }} />
+            <col style={{ width: "3%" }} />
+            <col style={{ width: "4%" }} />
+            <col style={{ width: "4%" }} />
+            <col style={{ width: "5%" }} />
+            <col style={{ width: "5%" }} />
+            <col style={{ width: "3%" }} />
+          </colgroup>
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200 text-gray-600">
-              <th className="w-10 px-3 py-3">
+              <th className="w-8 px-1 py-2">
                 <input
                   type="checkbox"
                   className="rounded"
@@ -156,25 +178,30 @@ export default function AIPTable({
                   onChange={toggleAll}
                 />
               </th>
-              <Th col="aipCode" label="AIP Code" cls="w-28" />
-              <Th
-                col="description"
-                label="Program / Project / Activity"
-                cls="w-72"
-              />
-              <Th col="sector" label="Sector" />
-              <Th col="department" label="Department" cls="w-44" />
-              <Th col={null} label="Schedule" />
-              <Th col="outputs" label="Expected Outputs" cls="w-48" />
-              <Th col="funding" label="Funding" />
+              {renderTh({ col: "aipCode", label: "AIP Code" })}
+              {renderTh({
+                col: "description",
+                label: "Program / Project / Activity",
+              })}
+              {renderTh({ col: "sector", label: "Sector" })}
+              {renderTh({
+                col: "department",
+                label: "Department",
+              })}
+              {renderTh({ col: null, label: "Schedule" })}
+              {renderTh({
+                col: "outputs",
+                label: "Expected Outputs",
+              })}
+              {renderTh({ col: "funding", label: "Funding" })}
               <th
-                className="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider bg-sky-50 text-sky-700 border-l border-sky-100"
+                className="px-1 py-2 text-center text-[10px] font-bold uppercase tracking-tight bg-sky-50 text-sky-700 border-l border-sky-100"
                 colSpan={5}
               >
                 Amount (₱ Thousands)
               </th>
               <th
-                className="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border-l border-emerald-100"
+                className="px-1 py-2 text-center text-[10px] font-bold uppercase tracking-tight bg-emerald-50 text-emerald-700 border-l border-emerald-100"
                 colSpan={3}
               >
                 Climate Change Expenditure
@@ -185,21 +212,21 @@ export default function AIPTable({
               {amountCols.map(([col, label]) => (
                 <th
                   key={col as string}
-                  className={`px-3 py-2 text-right font-semibold cursor-pointer hover:bg-sky-100 transition border-l border-sky-100 ${col === "total" ? "text-sky-700 font-bold" : ""}`}
+                  className={`px-1 py-2 text-right text-[10px] font-semibold cursor-pointer hover:bg-sky-100 transition border-l border-sky-100 ${col === "total" ? "text-sky-700 font-bold" : ""}`}
                   onClick={() => handleSort(col)}
                 >
                   {label}
-                  <SortIcon col={col} />
+                  {renderSortIcon(col)}
                 </th>
               ))}
               {ccCols.map(([col, label]) => (
                 <th
                   key={col as string}
-                  className="px-3 py-2 text-right font-semibold cursor-pointer hover:bg-emerald-100 transition border-l border-emerald-100"
+                  className="px-1 py-2 text-right text-[10px] font-semibold cursor-pointer hover:bg-emerald-100 transition border-l border-emerald-100"
                   onClick={() => handleSort(col)}
                 >
                   {label}
-                  <SortIcon col={col} />
+                  {renderSortIcon(col)}
                 </th>
               ))}
             </tr>
@@ -226,7 +253,7 @@ export default function AIPTable({
                   key={row.id}
                   className={`border-b border-gray-100 transition-colors ${rowBg}`}
                 >
-                  <td className="px-3 py-2 text-center">
+                  <td className="px-1 py-1.5 text-center">
                     <input
                       type="checkbox"
                       className="rounded"
@@ -238,17 +265,17 @@ export default function AIPTable({
                   <EditableCell
                     row={row}
                     field="aipCode"
-                    className="px-3 py-2 font-mono text-xs font-bold text-sky-700 whitespace-nowrap"
+                    className="px-1 py-1 font-mono text-[10px] font-bold text-sky-700"
                   />
                   <EditableCell
                     row={row}
                     field="description"
-                    className="px-3 py-2 font-medium text-gray-800 leading-snug"
+                    className="px-1.5 py-1.5 font-medium text-gray-800 leading-snug"
                   />
 
                   {/* Sector — dropdown */}
                   <td
-                    className="px-3 py-2 cursor-pointer"
+                    className="px-1.5 py-1.5 cursor-pointer"
                     onDoubleClick={() =>
                       startEdit(row.id, "sector", row.sector)
                     }
@@ -279,11 +306,11 @@ export default function AIPTable({
                   <EditableCell
                     row={row}
                     field="department"
-                    className="px-3 py-2 text-gray-600 text-xs"
+                    className="px-1.5 py-1.5 text-gray-600 text-[11px]"
                   />
 
                   {/* Schedule */}
-                  <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                  <td className="px-1.5 py-1.5 text-[11px] text-gray-500">
                     <div className="flex flex-col gap-0.5">
                       {editCell?.rowId === row.id &&
                       editCell?.field === "startDate" ? (
@@ -340,12 +367,12 @@ export default function AIPTable({
                   <EditableCell
                     row={row}
                     field="outputs"
-                    className="px-3 py-2 text-xs text-gray-600"
+                    className="px-1.5 py-1.5 text-[11px] text-gray-600"
                   />
 
                   {/* Funding */}
                   <td
-                    className="px-3 py-2 text-xs"
+                    className="px-1.5 py-1.5 text-[11px]"
                     onDoubleClick={() =>
                       startEdit(row.id, "funding", row.funding)
                     }
@@ -377,7 +404,7 @@ export default function AIPTable({
                       key={k as string}
                       row={row}
                       field={k}
-                      className="px-3 py-2 text-right text-xs text-gray-600 border-l border-sky-50 tabular-nums"
+                      className="px-1.5 py-1.5 text-right text-[11px] text-gray-600 border-l border-sky-50 tabular-nums"
                       numeric
                     />
                   ))}
@@ -387,26 +414,26 @@ export default function AIPTable({
                     row={row}
                     field="total"
                     readOnly
-                    className="px-3 py-2 text-right text-xs border-l border-sky-100 tabular-nums bg-sky-50/40"
+                    className="px-1.5 py-1.5 text-right text-[11px] border-l border-sky-100 tabular-nums bg-sky-50/40"
                   />
 
                   {/* CC fields */}
                   <EditableCell
                     row={row}
                     field="ccAdaptation"
-                    className="px-3 py-2 text-right text-xs text-emerald-700 border-l border-emerald-100 tabular-nums"
+                    className="px-1.5 py-1.5 text-right text-[11px] text-emerald-700 border-l border-emerald-100 tabular-nums"
                     numeric
                   />
                   <EditableCell
                     row={row}
                     field="ccMitigation"
-                    className="px-3 py-2 text-right text-xs text-emerald-700 tabular-nums"
+                    className="px-1.5 py-1.5 text-right text-[11px] text-emerald-700 tabular-nums"
                     numeric
                   />
                   <EditableCell
                     row={row}
                     field="ccCode"
-                    className="px-3 py-2 text-center text-xs"
+                    className="px-1.5 py-1.5 text-center text-[11px]"
                   />
                 </tr>
               );

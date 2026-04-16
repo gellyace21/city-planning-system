@@ -1,10 +1,18 @@
 import React from "react";
-import ProjectTable from "@/components/project-monitoring/ProjectTable";
+import ProjectTable from "../../../components/project-monitoring/ProjectTable";
+import { getMonitoringPageData } from "@/lib/services/projectMonitoringService";
 
-const page = () => {
+const page = async () => {
+  const { monitoringRows, history } = await getMonitoringPageData();
+
   return (
     <div>
-      <ProjectTable />
+      <ProjectTable
+        mode="monitoring"
+        initialAipRows={[]}
+        initialMonitoringRows={monitoringRows}
+        initialHistory={history}
+      />
     </div>
   );
 };
