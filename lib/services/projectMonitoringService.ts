@@ -14,7 +14,40 @@ interface DbShape {
   aip_rows?: RawAIPRow[];
   monitoring_rows?: RawMonitoringRow[];
   edit_history?: RawEditHistoryEntry[];
+  lead_files?: RawLeadFile[];
   [key: string]: unknown;
+}
+
+export interface ActorContext {
+  id: number;
+  role: "admin" | "superadmin" | "lead";
+}
+
+export interface LeadUploadInputRow {
+  aipCode: string;
+  description: string;
+  department: string;
+  startDate: string;
+  endDate: string;
+  outputs: string;
+  funding: string;
+  ps: number;
+  mooe: number;
+  fe: number;
+  co: number;
+  total: number;
+  ccAdaptation: number;
+  ccMitigation: number;
+  ccCode: string;
+  sector?: string;
+}
+
+export interface LeadFileSummary {
+  id: number;
+  lead_id: number;
+  file_name: string;
+  uploaded_at: string;
+  row_count: number;
 }
 
 interface RawAIPRow extends AIPRow {
@@ -41,9 +74,22 @@ interface RawEditHistoryEntry {
   old_value: string | number | null;
   new_value: string | number | null;
   edited_by_admin: number;
+  edited_by_user?: number;
+  edited_by_role?: "admin" | "superadmin" | "lead";
+  change_status?: "pending" | "approved" | "rejected";
+  reviewed_by_admin?: number | null;
+  reviewed_at?: string | null;
   edited_at: string;
   action_type?: "edit" | "add" | "delete";
   row_snapshot?: string | null;
+}
+
+interface RawLeadFile {
+  id: number;
+  lead_id: number;
+  file_name: string;
+  uploaded_at: string;
+  row_count: number;
 }
 
 const DEFAULT_PROJECT_ID = 1;
@@ -78,6 +124,8 @@ const toStringSafe = (value: unknown): string => {
 
 const toAipRow = (raw: RawAIPRow): AIPRow => ({
   id: toNumber(raw.id),
+  lead_id: raw.lead_id ? toNumber(raw.lead_id) : undefined,
+  upload_id: raw.upload_id ? toNumber(raw.upload_id) : undefined,
   sector: toStringSafe(raw.sector),
   aipCode: toStringSafe(raw.aipCode),
   description: toStringSafe(raw.description),
@@ -134,9 +182,25 @@ const toEditHistory = (raw: RawEditHistoryEntry): EditHistoryEntry => ({
       ? raw.new_value
       : String(raw.new_value ?? ""),
   edited_by_admin: toNumber(raw.edited_by_admin) || DEFAULT_ADMIN_ID,
+  edited_by_user: toNumber(raw.edited_by_user) || toNumber(raw.edited_by_admin),
+  edited_by_role: raw.edited_by_role ?? "admin",
+  change_status: raw.change_status ?? "approved",
+  reviewed_by_admin:
+    raw.reviewed_by_admin === null || raw.reviewed_by_admin === undefined
+      ? null
+      : toNumber(raw.reviewed_by_admin),
+  reviewed_at: raw.reviewed_at ?? null,
   edited_at: toStringSafe(raw.edited_at),
   action_type: raw.action_type ?? "edit",
   row_snapshot: typeof raw.row_snapshot === "string" ? raw.row_snapshot : null,
+});
+
+const toLeadFileSummary = (raw: RawLeadFile): LeadFileSummary => ({
+  id: toNumber(raw.id),
+  lead_id: toNumber(raw.lead_id),
+  file_name: toStringSafe(raw.file_name),
+  uploaded_at: toStringSafe(raw.uploaded_at),
+  row_count: toNumber(raw.row_count),
 });
 
 const readDb = async (): Promise<DbShape> => {
@@ -160,6 +224,11 @@ const appendHistory = (
   const created: EditHistoryEntry = {
     id: nextId(history),
     edited_at: new Date().toISOString(),
+    edited_by_user: entry.edited_by_user ?? entry.edited_by_admin,
+    edited_by_role: entry.edited_by_role ?? "admin",
+    change_status: entry.change_status ?? "approved",
+    reviewed_by_admin: entry.reviewed_by_admin ?? null,
+    reviewed_at: entry.reviewed_at ?? null,
     ...entry,
   };
   history.push(created);
@@ -195,7 +264,8 @@ const getHistoryForRow = (
     .map(toEditHistory)
     .filter(
       (entry) =>
-        entry.entity_name === target.entity_name && entry.row_id === target.row_id,
+        entry.entity_name === target.entity_name &&
+        entry.row_id === target.row_id,
     )
     .sort(compareHistoryEntries);
 };
@@ -206,6 +276,21 @@ const getAipRows = (db: DbShape): RawAIPRow[] => {
 
 const getMonitoringRows = (db: DbShape): RawMonitoringRow[] => {
   return (db.monitoring_rows ?? []) as RawMonitoringRow[];
+};
+
+const getLeadFiles = (db: DbShape): RawLeadFile[] => {
+  return (db.lead_files ?? []) as RawLeadFile[];
+};
+
+const isAdminRole = (role: ActorContext["role"]): boolean => {
+  return role === "admin" || role === "superadmin";
+};
+
+const normalizeAipValue = (
+  field: keyof AIPRow,
+  value: string | number,
+): string | number => {
+  return AIP_NUMERIC_FIELDS.has(field) ? toNumber(value) : String(value ?? "");
 };
 
 const restoreAipSnapshot = (
@@ -340,10 +425,14 @@ export async function getMonitoringPageData(): Promise<{
   return { monitoringRows, history };
 }
 
-export async function createAipRow(): Promise<{
+export async function createAipRow(actor: ActorContext): Promise<{
   row: AIPRow;
   historyEntry: EditHistoryEntry;
 }> {
+  if (!isAdminRole(actor.role)) {
+    throw new Error("Only admins can create AIP rows.");
+  }
+
   const db = await readDb();
   const rows = db.aip_rows ?? [];
   const row: RawAIPRow = {
@@ -378,7 +467,10 @@ export async function createAipRow(): Promise<{
     column_name: "__row__",
     old_value: null,
     new_value: summarizeAipRow(row),
-    edited_by_admin: DEFAULT_ADMIN_ID,
+    edited_by_admin: actor.id,
+    edited_by_user: actor.id,
+    edited_by_role: actor.role,
+    change_status: "approved",
     action_type: "add",
     row_snapshot: snapshotRow(row),
   });
@@ -391,6 +483,7 @@ export async function updateAipRowField(
   rowId: number,
   field: keyof AIPRow,
   value: string | number,
+  actor: ActorContext,
 ): Promise<{
   row: AIPRow;
   historyEntry: EditHistoryEntry | null;
@@ -402,12 +495,50 @@ export async function updateAipRowField(
 
   const row = { ...rows[idx] };
   const oldValue = row[field];
-  const parsed = AIP_NUMERIC_FIELDS.has(field)
-    ? toNumber(value)
-    : String(value ?? "");
+  const parsed = normalizeAipValue(field, value);
 
   if (String(oldValue) === String(parsed)) {
     return { row: toAipRow(row), historyEntry: null };
+  }
+
+  if (isAdminRole(actor.role)) {
+    row[field] = parsed as never;
+
+    if (
+      field === "ps" ||
+      field === "mooe" ||
+      field === "fe" ||
+      field === "co"
+    ) {
+      row.total =
+        toNumber(row.ps) +
+        toNumber(row.mooe) +
+        toNumber(row.fe) +
+        toNumber(row.co);
+    }
+
+    rows[idx] = row;
+    const historyEntry = appendHistory(db, {
+      project_id: row.project_id ?? DEFAULT_PROJECT_ID,
+      entity_name: "aip_rows",
+      row_id: row.id,
+      column_name: String(field),
+      old_value:
+        typeof oldValue === "number" ? oldValue : String(oldValue ?? ""),
+      new_value: typeof parsed === "number" ? parsed : String(parsed ?? ""),
+      edited_by_admin: actor.id,
+      edited_by_user: actor.id,
+      edited_by_role: actor.role,
+      change_status: "approved",
+      action_type: "edit",
+    });
+    db.aip_rows = rows;
+    await writeDb(db);
+    return { row: toAipRow(row), historyEntry };
+  }
+
+  if (row.lead_id !== actor.id) {
+    throw new Error("Leads can only edit their own uploaded rows.");
   }
 
   row[field] = parsed as never;
@@ -429,8 +560,12 @@ export async function updateAipRowField(
     old_value: typeof oldValue === "number" ? oldValue : String(oldValue ?? ""),
     new_value: typeof parsed === "number" ? parsed : String(parsed ?? ""),
     edited_by_admin: DEFAULT_ADMIN_ID,
+    edited_by_user: actor.id,
+    edited_by_role: actor.role,
+    change_status: "approved",
     action_type: "edit",
   });
+
   db.aip_rows = rows;
   await writeDb(db);
   return { row: toAipRow(row), historyEntry };
@@ -438,7 +573,12 @@ export async function updateAipRowField(
 
 export async function deleteAipRows(
   ids: number[],
+  actor: ActorContext,
 ): Promise<EditHistoryEntry[]> {
+  if (!isAdminRole(actor.role)) {
+    throw new Error("Only admins can delete AIP rows.");
+  }
+
   const db = await readDb();
   const selected = new Set(ids);
   const toDelete = (db.aip_rows ?? []).filter((row) => selected.has(row.id));
@@ -450,7 +590,10 @@ export async function deleteAipRows(
       column_name: "__row__",
       old_value: summarizeAipRow(row),
       new_value: null,
-      edited_by_admin: DEFAULT_ADMIN_ID,
+      edited_by_admin: actor.id,
+      edited_by_user: actor.id,
+      edited_by_role: actor.role,
+      change_status: "approved",
       action_type: "delete",
       row_snapshot: snapshotRow(row),
     }),
@@ -461,10 +604,14 @@ export async function deleteAipRows(
   return historyEntries;
 }
 
-export async function createMonitoringRow(): Promise<{
+export async function createMonitoringRow(actor: ActorContext): Promise<{
   row: MonitoringRow;
   historyEntry: EditHistoryEntry;
 }> {
+  if (!isAdminRole(actor.role)) {
+    throw new Error("Only admins can create monitoring rows.");
+  }
+
   const db = await readDb();
   const rows = db.monitoring_rows ?? [];
   const row: RawMonitoringRow = {
@@ -496,7 +643,10 @@ export async function createMonitoringRow(): Promise<{
     column_name: "__row__",
     old_value: null,
     new_value: summarizeMonitoringRow(row),
-    edited_by_admin: DEFAULT_ADMIN_ID,
+    edited_by_admin: actor.id,
+    edited_by_user: actor.id,
+    edited_by_role: actor.role,
+    change_status: "approved",
     action_type: "add",
     row_snapshot: snapshotRow(row),
   });
@@ -509,10 +659,15 @@ export async function updateMonitoringRowField(
   rowId: number,
   field: keyof MonitoringRow,
   value: string | number,
+  actor: ActorContext,
 ): Promise<{
   row: MonitoringRow;
   historyEntry: EditHistoryEntry | null;
 }> {
+  if (!isAdminRole(actor.role)) {
+    throw new Error("Only admins can edit monitoring rows.");
+  }
+
   const db = await readDb();
   const rows = db.monitoring_rows ?? [];
   const idx = rows.findIndex((row) => row.id === rowId);
@@ -538,7 +693,10 @@ export async function updateMonitoringRowField(
     column_name: String(field),
     old_value: typeof oldValue === "number" ? oldValue : String(oldValue ?? ""),
     new_value: typeof parsed === "number" ? parsed : String(parsed ?? ""),
-    edited_by_admin: DEFAULT_ADMIN_ID,
+    edited_by_admin: actor.id,
+    edited_by_user: actor.id,
+    edited_by_role: actor.role,
+    change_status: "approved",
     action_type: "edit",
   });
 
@@ -549,7 +707,12 @@ export async function updateMonitoringRowField(
 
 export async function deleteMonitoringRows(
   ids: number[],
+  actor: ActorContext,
 ): Promise<EditHistoryEntry[]> {
+  if (!isAdminRole(actor.role)) {
+    throw new Error("Only admins can delete monitoring rows.");
+  }
+
   const db = await readDb();
   const selected = new Set(ids);
   const toDelete = (db.monitoring_rows ?? []).filter((row) =>
@@ -563,7 +726,10 @@ export async function deleteMonitoringRows(
       column_name: "__row__",
       old_value: summarizeMonitoringRow(row),
       new_value: null,
-      edited_by_admin: DEFAULT_ADMIN_ID,
+      edited_by_admin: actor.id,
+      edited_by_user: actor.id,
+      edited_by_role: actor.role,
+      change_status: "approved",
       action_type: "delete",
       row_snapshot: snapshotRow(row),
     }),
@@ -574,6 +740,165 @@ export async function deleteMonitoringRows(
   );
   await writeDb(db);
   return historyEntries;
+}
+
+export async function uploadLeadAipRows(
+  actor: ActorContext,
+  fileName: string,
+  rowsToUpload: LeadUploadInputRow[],
+): Promise<{ uploadedRows: AIPRow[]; file: LeadFileSummary }> {
+  if (actor.role !== "lead") {
+    throw new Error("Only leads can upload AIP files.");
+  }
+
+  const cleanedRows = rowsToUpload.filter(
+    (row) => row.aipCode?.trim() || row.description?.trim(),
+  );
+  if (cleanedRows.length === 0) {
+    throw new Error("The uploaded file has no valid AIP rows.");
+  }
+
+  const db = await readDb();
+  const leadFiles = getLeadFiles(db);
+  const aipRows = getAipRows(db);
+
+  const fileRecord: RawLeadFile = {
+    id: nextId(leadFiles),
+    lead_id: actor.id,
+    file_name: fileName || `lead-upload-${Date.now()}.xlsx`,
+    uploaded_at: new Date().toISOString(),
+    row_count: cleanedRows.length,
+  };
+  leadFiles.push(fileRecord);
+
+  const createdRows: RawAIPRow[] = cleanedRows.map((row, index) => {
+    const ps = toNumber(row.ps);
+    const mooe = toNumber(row.mooe);
+    const fe = toNumber(row.fe);
+    const co = toNumber(row.co);
+    const total = toNumber(row.total) || ps + mooe + fe + co;
+
+    return {
+      id: nextId(aipRows) + index,
+      project_id: DEFAULT_PROJECT_ID,
+      upload_id: fileRecord.id,
+      lead_id: actor.id,
+      row_number: aipRows.length + index + 1,
+      year: new Date().getFullYear(),
+      sector: row.sector ?? "",
+      aipCode: String(row.aipCode ?? ""),
+      description: String(row.description ?? ""),
+      department: String(row.department ?? ""),
+      startDate: String(row.startDate ?? ""),
+      endDate: String(row.endDate ?? ""),
+      outputs: String(row.outputs ?? ""),
+      funding: String(row.funding ?? ""),
+      ps,
+      mooe,
+      fe,
+      co,
+      total,
+      ccAdaptation: toNumber(row.ccAdaptation),
+      ccMitigation: toNumber(row.ccMitigation),
+      ccCode: String(row.ccCode ?? ""),
+      created_at: new Date().toISOString(),
+    };
+  });
+
+  db.lead_files = leadFiles;
+  db.aip_rows = [...aipRows, ...createdRows];
+  await writeDb(db);
+
+  return {
+    uploadedRows: createdRows.map(toAipRow),
+    file: toLeadFileSummary(fileRecord),
+  };
+}
+
+export async function getLeadUploadedFiles(
+  actor: ActorContext,
+): Promise<LeadFileSummary[]> {
+  const db = await readDb();
+  const allFiles = getLeadFiles(db).map(toLeadFileSummary);
+
+  if (isAdminRole(actor.role)) {
+    return allFiles.sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at));
+  }
+
+  return allFiles
+    .filter((file) => file.lead_id === actor.id)
+    .sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at));
+}
+
+export async function reviewAipSuggestion(
+  actor: ActorContext,
+  historyId: number,
+  decision: "approved" | "rejected",
+): Promise<EditHistoryEntry> {
+  if (!isAdminRole(actor.role)) {
+    throw new Error("Only admins can approve or reject lead suggestions.");
+  }
+
+  const db = await readDb();
+  const history = (db.edit_history ?? []) as RawEditHistoryEntry[];
+  const entryIndex = history.findIndex((item) => item.id === historyId);
+  if (entryIndex < 0) {
+    throw new Error("Suggestion not found.");
+  }
+
+  const suggestion = toEditHistory(history[entryIndex]);
+  if (suggestion.entity_name !== "aip_rows") {
+    throw new Error("Only AIP suggestions are supported.");
+  }
+  if (suggestion.change_status !== "pending") {
+    throw new Error("This suggestion has already been reviewed.");
+  }
+  if (suggestion.edited_by_role !== "lead") {
+    throw new Error("Only lead-originated suggestions can be reviewed.");
+  }
+
+  if (decision === "approved") {
+    const rows = getAipRows(db);
+    const rowIndex = rows.findIndex((row) => row.id === suggestion.row_id);
+    if (rowIndex < 0) {
+      throw new Error("AIP row not found for this suggestion.");
+    }
+
+    const field = suggestion.column_name as keyof AIPRow;
+    const row = { ...rows[rowIndex] };
+    row[field] = (
+      typeof row[field] === "number"
+        ? toNumber(suggestion.new_value)
+        : String(suggestion.new_value ?? "")
+    ) as never;
+
+    if (
+      field === "ps" ||
+      field === "mooe" ||
+      field === "fe" ||
+      field === "co"
+    ) {
+      row.total =
+        toNumber(row.ps) +
+        toNumber(row.mooe) +
+        toNumber(row.fe) +
+        toNumber(row.co);
+    }
+
+    rows[rowIndex] = row;
+    db.aip_rows = rows;
+  }
+
+  history[entryIndex] = {
+    ...history[entryIndex],
+    change_status: decision,
+    reviewed_by_admin: actor.id,
+    reviewed_at: new Date().toISOString(),
+  };
+  db.edit_history = history;
+  await writeDb(db);
+
+  return toEditHistory(history[entryIndex]);
 }
 
 export async function restoreHistoryEntry(historyId: number): Promise<{
@@ -588,8 +913,19 @@ export async function restoreHistoryEntry(historyId: number): Promise<{
 
   const entry = toEditHistory(rawEntry as RawEditHistoryEntry);
 
+  if (entry.change_status && entry.change_status !== "approved") {
+    throw new Error("Only approved history entries can be restored.");
+  }
+  if (entry.edited_by_role === "lead") {
+    throw new Error(
+      "Lead suggestions must be reviewed through approve/reject.",
+    );
+  }
+
   const rowHistory = getHistoryForRow(db, entry);
-  const targetIndex = rowHistory.findIndex((historyEntry) => historyEntry.id === entry.id);
+  const targetIndex = rowHistory.findIndex(
+    (historyEntry) => historyEntry.id === entry.id,
+  );
   if (targetIndex < 0) {
     throw new Error("History entry not found for row");
   }

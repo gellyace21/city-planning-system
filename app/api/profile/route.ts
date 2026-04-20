@@ -1,22 +1,30 @@
-import { getSession } from "next-auth/react";
+import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import {
-  getAdminProfile,
-  updateAdminProfile,
+  getUserProfileByRole,
+  updateUserProfileByRole,
 } from "@/lib/services/profileService";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 export async function GET(request: NextRequest) {
   try {
-    const adminId = request.nextUrl.searchParams.get("id");
-
-    if (!adminId) {
-      return NextResponse.json(
-        { error: "Admin ID is required" },
-        { status: 400 },
-      );
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id || !session?.user?.role) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const profile = await getAdminProfile(parseInt(adminId));
+    const requestedId = Number(request.nextUrl.searchParams.get("id"));
+    const sessionId = Number(session.user.id);
+    const role = String(session.user.role);
+
+    const profileId =
+      Number.isFinite(requestedId) && requestedId > 0 ? requestedId : sessionId;
+
+    if (role !== "admin" && role !== "superadmin" && profileId !== sessionId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const profile = await getUserProfileByRole(profileId, role);
     return NextResponse.json(profile);
   } catch (error) {
     console.error("Error fetching profile:", error);
@@ -32,17 +40,30 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id || !session?.user?.role) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { id, name, email, phone, profile_pic } = body;
+    const profileId = Number(id);
 
-    if (!id) {
+    if (!Number.isFinite(profileId) || profileId <= 0) {
       return NextResponse.json(
-        { error: "Admin ID is required" },
+        { error: "User ID is required" },
         { status: 400 },
       );
     }
 
-    const updatedProfile = await updateAdminProfile(parseInt(id), {
+    const sessionId = Number(session.user.id);
+    const role = String(session.user.role);
+
+    if (role !== "admin" && role !== "superadmin" && profileId !== sessionId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const updatedProfile = await updateUserProfileByRole(profileId, role, {
       name,
       email,
       phone,

@@ -19,7 +19,10 @@ declare module "next-auth" {
   }
 }
 
-export const authOptions = {
+const fallbackDevSecret = "city-planning-dev-secret-change-me";
+
+export const authOptions: AuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET || fallbackDevSecret,
   providers: [
     CredentialsProvider({
       name: "Credentials",

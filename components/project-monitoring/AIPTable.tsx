@@ -26,6 +26,8 @@ interface AIPTableProps {
   handleSort: (col: SortKey) => void;
   sortCol: SortKey;
   sortDir: SortDir;
+  cellStatuses: Record<string, "pending" | "approved" | "rejected">;
+  focusedRowId?: number | null;
 }
 
 export default function AIPTable({
@@ -43,6 +45,8 @@ export default function AIPTable({
   handleSort,
   sortCol,
   sortDir,
+  cellStatuses,
+  focusedRowId,
 }: AIPTableProps): React.JSX.Element {
   // ── Sub-components ──
   interface EditableCellProps {
@@ -62,10 +66,19 @@ export default function AIPTable({
   }) => {
     const isActive = editCell?.rowId === row.id && editCell?.field === field;
     const value = row[field];
+    const status = cellStatuses[`${row.id}:${String(field)}`];
+    const statusClass =
+      status === "pending"
+        ? "bg-sky-100/70"
+        : status === "approved"
+          ? "bg-blue-50/80"
+          : status === "rejected"
+            ? "bg-rose-50/80"
+            : "";
 
     if (readOnly) {
       return (
-        <td className={className}>
+        <td className={`${className} ${statusClass}`}>
           <span className="font-bold text-sky-700">{fmt(value as number)}</span>
         </td>
       );
@@ -73,7 +86,7 @@ export default function AIPTable({
 
     if (isActive) {
       return (
-        <td className={className}>
+        <td className={`${className} ${statusClass}`}>
           <input
             autoFocus
             type={numeric ? "number" : "text"}
@@ -89,7 +102,7 @@ export default function AIPTable({
 
     return (
       <td
-        className={`${className} cursor-pointer group`}
+        className={`${className} ${statusClass} cursor-pointer group`}
         onDoubleClick={() => startEdit(row.id, field, value)}
         title="Double-click to edit"
       >
@@ -99,6 +112,17 @@ export default function AIPTable({
             : (value as string) || (
                 <span className="text-gray-300 italic text-xs">—</span>
               )}
+          {status && (
+            <span
+              className={`ml-1 inline-block h-1.5 w-1.5 rounded-full ${
+                status === "pending"
+                  ? "bg-sky-600"
+                  : status === "approved"
+                    ? "bg-blue-600"
+                    : "bg-rose-500"
+              }`}
+            />
+          )}
         </span>
       </td>
     );
@@ -248,10 +272,12 @@ export default function AIPTable({
                 : i % 2 === 0
                   ? "bg-white hover:bg-sky-50/20"
                   : "bg-gray-50/50 hover:bg-sky-50/20";
+              const isFocused = focusedRowId === row.id;
               return (
                 <tr
                   key={row.id}
-                  className={`border-b border-gray-100 transition-colors ${rowBg}`}
+                  id={`aip-row-${row.id}`}
+                  className={`border-b border-gray-100 transition-colors ${rowBg} ${isFocused ? "ring-2 ring-amber-400 bg-amber-50" : ""}`}
                 >
                   <td className="px-1 py-1.5 text-center">
                     <input

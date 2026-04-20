@@ -1,13 +1,15 @@
 "use client";
 
-import React, { KeyboardEvent, useMemo, useState } from "react";
+import React, { KeyboardEvent, useEffect, useMemo, useState } from "react";
 import {
   createAipRowAction,
   createMonitoringRowAction,
   deleteAipRowsAction,
   deleteMonitoringRowsAction,
+  fetchLeadUploadedFilesAction,
   fetchProjectMonitoringDataAction,
   restoreHistoryEntryAction,
+  uploadLeadAipFileAction,
   updateAipRowFieldAction,
   updateMonitoringRowFieldAction,
 } from "@/lib/services/projectMonitoringActions";
@@ -24,6 +26,8 @@ import {
   SortKey,
 } from "./types";
 import { IconBook, IconHistory, IconTrash } from "@tabler/icons-react";
+import { parseAIPExcel } from "@/lib/aipExport";
+import { useSession } from "next-auth/react";
 
 type ActiveDataset = "aip" | "monitoring";
 
@@ -58,10 +62,19 @@ export default function ProjectTable({
   initialMonitoringRows,
   initialHistory,
 }: ProjectTableProps): React.JSX.Element {
+  const { data: session } = useSession();
+  const actorRole = session?.user?.role;
+  const isLead = actorRole === "lead";
+  const isAdmin = actorRole === "admin" || actorRole === "superadmin";
+
   const [busy, setBusy] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [showHistory, setShowHistory] = useState<boolean>(false);
   const [history, setHistory] = useState<EditHistoryEntry[]>(initialHistory);
+  const [leadFiles, setLeadFiles] = useState<
+    { id: number; file_name: string; uploaded_at: string; row_count: number }[]
+  >([]);
+  const [uploadingFile, setUploadingFile] = useState<boolean>(false);
 
   const [aipRows, setAipRows] = useState<AIPRow[]>(initialAipRows);
   const [aipSearch, setAipSearch] = useState<string>("");
@@ -71,6 +84,7 @@ export default function ProjectTable({
   const [aipSelectedRows, setAipSelectedRows] = useState<Set<number>>(
     new Set(),
   );
+  const [focusedAipRowId, setFocusedAipRowId] = useState<number | null>(null);
   const [aipEditCell, setAipEditCell] = useState<EditCell>(null);
   const [aipEditValue, setAipEditValue] = useState<string>("");
 
@@ -88,13 +102,22 @@ export default function ProjectTable({
     useState<MonitoringEditCell>(null);
   const [monitoringEditValue, setMonitoringEditValue] = useState<string>("");
 
+  const visibleAipRows = useMemo(() => {
+    if (!isLead) return aipRows;
+    const leadId = Number(session?.user?.id);
+    return aipRows.filter((row) => row.lead_id === leadId);
+  }, [aipRows, isLead, session?.user?.id]);
+
   const allSectors = useMemo(
-    () => ["All", ...new Set(aipRows.map((row) => row.sector).filter(Boolean))],
-    [aipRows],
+    () => [
+      "All",
+      ...new Set(visibleAipRows.map((row) => row.sector).filter(Boolean)),
+    ],
+    [visibleAipRows],
   );
 
   const filteredAip = useMemo(() => {
-    return aipRows
+    return visibleAipRows
       .filter((row) => aipSector === "All" || row.sector === aipSector)
       .filter((row) => {
         if (!aipSearch.trim()) return true;
@@ -118,7 +141,7 @@ export default function ProjectTable({
             : String(av).localeCompare(String(bv));
         return aipSortDir === "asc" ? cmp : -cmp;
       });
-  }, [aipRows, aipSector, aipSearch, aipSortCol, aipSortDir]);
+  }, [visibleAipRows, aipSector, aipSearch, aipSortCol, aipSortDir]);
 
   const filteredMonitoring = useMemo(() => {
     return monitoringRows
@@ -148,6 +171,50 @@ export default function ProjectTable({
         return monitoringSortDir === "asc" ? cmp : -cmp;
       });
   }, [monitoringRows, monitoringSearch, monitoringSortCol, monitoringSortDir]);
+
+  useEffect(() => {
+    if (!session?.user) return;
+    void (async () => {
+      try {
+        const files = await fetchLeadUploadedFilesAction();
+        setLeadFiles(files);
+      } catch {
+        setLeadFiles([]);
+      }
+    })();
+  }, [session?.user?.id, session?.user?.role]);
+
+  const leadCellStatuses = useMemo(() => {
+    const map: Record<string, "pending" | "approved" | "rejected"> = {};
+    const sorted = [...history].sort(
+      (a, b) =>
+        new Date(b.edited_at).getTime() - new Date(a.edited_at).getTime(),
+    );
+    for (const entry of sorted) {
+      if (entry.entity_name !== "aip_rows" || entry.action_type !== "edit")
+        continue;
+      if (entry.edited_by_role !== "lead") continue;
+      const key = `${entry.row_id}:${entry.column_name}`;
+      if (!map[key] && entry.change_status) {
+        map[key] = entry.change_status;
+      }
+    }
+    return map;
+  }, [history]);
+
+  const leadChangeLog = useMemo(() => {
+    return history.filter(
+      (entry) =>
+        entry.entity_name === "aip_rows" &&
+        entry.edited_by_role === "lead" &&
+        entry.action_type === "edit",
+    );
+  }, [history]);
+
+  const historyFeed = useMemo(() => {
+    if (mode === "aip" && isAdmin) return leadChangeLog;
+    return history;
+  }, [history, isAdmin, leadChangeLog, mode]);
 
   const handleFailure = (error: unknown): void => {
     setErrorMsg(
@@ -270,6 +337,46 @@ export default function ProjectTable({
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleLeadAipUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ): Promise<void> => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+    setErrorMsg("");
+    try {
+      const parsedRows = await parseAIPExcel(file);
+      const result = await uploadLeadAipFileAction(file.name, parsedRows);
+      setAipRows((prev) => [...prev, ...result.uploadedRows]);
+      const files = await fetchLeadUploadedFilesAction();
+      setLeadFiles(files);
+    } catch (error) {
+      handleFailure(error);
+    } finally {
+      setUploadingFile(false);
+      e.target.value = "";
+    }
+  };
+
+  const jumpToAipChange = (entry: EditHistoryEntry): void => {
+    setAipSearch("");
+    setAipSector("All");
+    setShowHistory(false);
+    setFocusedAipRowId(entry.row_id);
+
+    window.setTimeout(() => {
+      const target = document.getElementById(`aip-row-${entry.row_id}`);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 50);
+
+    window.setTimeout(() => {
+      setFocusedAipRowId(null);
+    }, 900);
   };
 
   const startMonitoringEdit = (
@@ -414,16 +521,21 @@ export default function ProjectTable({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowHistory((v) => !v)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-semibold border flex gap-2 justify-center items-center hover:bg-amber-100 hover:cursor-pointer duration-200 ease-in-out ${
-                showHistory
-                  ? "bg-amber-600 text-white border-amber-600 hover:bg-amber-400"
-                  : "bg-white text-amber-700 border-amber-200"
-              }`}
-            >
-              <IconHistory /> History ({history.length})
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setShowHistory((v) => !v)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-semibold border flex gap-2 justify-center items-center hover:bg-amber-100 hover:cursor-pointer duration-200 ease-in-out ${
+                  showHistory
+                    ? "bg-amber-600 text-white border-amber-600 hover:bg-amber-400"
+                    : "bg-white text-amber-700 border-amber-200"
+                }`}
+              >
+                <IconHistory />
+                {mode === "aip"
+                  ? `Lead Change Log (${historyFeed.length})`
+                  : `History (${historyFeed.length})`}
+              </button>
+            )}
           </div>
         </div>
 
@@ -433,60 +545,134 @@ export default function ProjectTable({
           </div>
         )}
 
-        <div
-          className={`bg-white border fixed ${showHistory ? "right-0" : "-right-100"} duration-200 ease-in-out top-25 border-gray-200 rounded-2xl shadow-sm overflow-hidden h-full z-1`}
-        >
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-gray-900">Edit History</h2>
-            <span className="text-xs text-gray-500">
-              {history.length} changes
-            </span>
-          </div>
-          <div className="max-h-full overflow-y-auto divide-y divide-gray-100">
-            {history.length === 0 ? (
-              <div className="px-4 py-6 text-sm text-gray-400">
-                No history yet.
-              </div>
-            ) : (
-              history.map((entry) => (
-                <div key={entry.id} className="px-4 py-3 text-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-gray-800">
-                      {entry.entity_name === "aip_rows" ? "AIP" : "Monitoring"}{" "}
-                      · {entry.action_type.toUpperCase()}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      {new Date(entry.edited_at).toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    Row {entry.row_id} · Field {entry.column_name}
-                  </div>
-                  <div className="mt-1 text-xs flex items-center gap-1.5 flex-wrap">
-                    <span className="px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-100">
-                      {entry.old_value === null ? "—" : String(entry.old_value)}
-                    </span>
-                    <span className="text-gray-400">to</span>
-                    <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
-                      {entry.new_value === null ? "—" : String(entry.new_value)}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => void restoreHistory(entry)}
-                    disabled={busy}
-                    className="mt-2 text-xs font-semibold text-amber-700 hover:underline disabled:opacity-50"
-                  >
-                    Restore
-                  </button>
+        {isAdmin && (
+          <div
+            className={`bg-white border fixed ${showHistory ? "right-0" : "-right-100"} duration-200 ease-in-out top-25 border-gray-200 rounded-2xl shadow-sm overflow-hidden h-full z-1`}
+          >
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-gray-900">
+                {mode === "aip" ? "Lead Change Log" : "Edit History"}
+              </h2>
+              <span className="text-xs text-gray-500">
+                {historyFeed.length} changes
+              </span>
+            </div>
+            <div className="max-h-full overflow-y-auto divide-y divide-gray-100">
+              {historyFeed.length === 0 ? (
+                <div className="px-4 py-6 text-sm text-gray-400">
+                  No history yet.
                 </div>
-              ))
-            )}
+              ) : (
+                historyFeed.map((entry) => (
+                  <div key={entry.id} className="px-4 py-3 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-gray-800">
+                        {entry.entity_name === "aip_rows"
+                          ? "AIP"
+                          : "Monitoring"}{" "}
+                        · {entry.action_type.toUpperCase()}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(entry.edited_at).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      Row {entry.row_id} · Field {entry.column_name}
+                    </div>
+                    <div className="mt-1 text-xs flex items-center gap-1.5 flex-wrap">
+                      <span className="px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-100">
+                        {entry.old_value === null
+                          ? "—"
+                          : String(entry.old_value)}
+                      </span>
+                      <span className="text-gray-400">to</span>
+                      <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
+                        {entry.new_value === null
+                          ? "—"
+                          : String(entry.new_value)}
+                      </span>
+                    </div>
+                    {mode === "aip" ? (
+                      <button
+                        onClick={() => jumpToAipChange(entry)}
+                        className="mt-2 text-xs font-semibold text-sky-700 hover:underline"
+                      >
+                        Jump To Row
+                      </button>
+                    ) : entry.edited_by_role !== "lead" &&
+                      entry.change_status === "approved" ? (
+                      <button
+                        onClick={() => void restoreHistory(entry)}
+                        disabled={busy}
+                        className="mt-2 text-xs font-semibold text-amber-700 hover:underline disabled:opacity-50"
+                      >
+                        Restore
+                      </button>
+                    ) : null}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {mode === "aip" ? (
           // AIP
           <>
+            {isLead && (
+              <div className="p-4 rounded-xl border border-gray-200 bg-white">
+                <div className="flex flex-wrap gap-3 items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-gray-800">
+                      Upload AIP .xlsx
+                    </h2>
+                    <p className="text-xs text-gray-500">
+                      Uploaded rows are editable live, and every lead edit is
+                      logged for admin tracking.
+                    </p>
+                  </div>
+                  <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-sky-600 text-white text-sm font-semibold cursor-pointer hover:bg-sky-500">
+                    {uploadingFile ? "Uploading..." : "Upload File"}
+                    <input
+                      type="file"
+                      accept=".xlsx"
+                      onChange={(e) => {
+                        void handleLeadAipUpload(e);
+                      }}
+                      disabled={uploadingFile}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-3">
+                  <p className="text-xs font-semibold text-gray-700 mb-2">
+                    Uploaded files
+                  </p>
+                  {leadFiles.length === 0 ? (
+                    <p className="text-xs text-gray-400">No uploads yet.</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {leadFiles.map((file) => (
+                        <div
+                          key={file.id}
+                          className="px-2 py-1.5 text-xs rounded border border-gray-100 bg-gray-50 flex items-center justify-between"
+                        >
+                          <span className="font-medium text-gray-700">
+                            {file.file_name}
+                          </span>
+                          <span className="text-gray-500">
+                            {file.row_count} rows ·{" "}
+                            {new Date(file.uploaded_at).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-2 items-center">
               <input
                 value={aipSearch}
@@ -505,20 +691,24 @@ export default function ProjectTable({
                   </option>
                 ))}
               </select>
-              <button
-                onClick={() => void addAipRow()}
-                disabled={busy}
-                className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm font-semibold disabled:opacity-50"
-              >
-                + Add AIP Row
-              </button>
-              <button
-                onClick={() => void deleteAipSelection()}
-                disabled={busy || aipSelectedRows.size === 0}
-                className="px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold disabled:opacity-50"
-              >
-                Delete ({aipSelectedRows.size})
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => void addAipRow()}
+                  disabled={busy}
+                  className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm font-semibold disabled:opacity-50"
+                >
+                  + Add AIP Row
+                </button>
+              )}
+              {isAdmin && (
+                <button
+                  onClick={() => void deleteAipSelection()}
+                  disabled={busy || aipSelectedRows.size === 0}
+                  className="px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold disabled:opacity-50"
+                >
+                  Delete ({aipSelectedRows.size})
+                </button>
+              )}
             </div>
 
             <AIPTable
@@ -538,6 +728,8 @@ export default function ProjectTable({
               handleSort={handleAipSort}
               sortCol={aipSortCol}
               sortDir={aipSortDir}
+              cellStatuses={leadCellStatuses}
+              focusedRowId={focusedAipRowId}
             />
           </>
         ) : (

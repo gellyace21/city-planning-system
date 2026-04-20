@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
+import { Geist, Geist_Mono, Inter, Montserrat } from "next/font/google";
 import "@/app/globals.css";
 import Footer from "../components/layout/footer";
 import Nav from "../components/layout/navbar";
@@ -7,6 +7,11 @@ import { cn } from "@/lib/utils";
 import { AuthProvider } from "./providers";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-montserrat-next",
+});
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,13 +34,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", inter.variable)}>
+    <html
+      lang="en"
+      className={cn("font-sans", inter.variable, montserrat.variable)}
+    >
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased `}
       >
         <AuthProvider>
           <Nav />
-          <main className="flex min-h-screen flex-col items-center justify-start gap-12 relative">
+          <main className="flex min-h-screen flex-col items-center justify-start gap-12 relative mt-24">
             {children}
           </main>
           <Footer />

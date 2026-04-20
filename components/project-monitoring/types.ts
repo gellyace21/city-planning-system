@@ -1,5 +1,7 @@
 export interface AIPRow {
   id: number;
+  lead_id?: number;
+  upload_id?: number;
   sector: string;
   aipCode: string;
   description: string;
@@ -45,6 +47,11 @@ export interface EditHistoryEntry {
   old_value: string | number | null;
   new_value: string | number | null;
   edited_by_admin: number;
+  edited_by_user?: number;
+  edited_by_role?: "admin" | "superadmin" | "lead";
+  change_status?: "pending" | "approved" | "rejected";
+  reviewed_by_admin?: number | null;
+  reviewed_at?: string | null;
   edited_at: string;
   action_type: "edit" | "add" | "delete";
   row_snapshot?: string | null;
