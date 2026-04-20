@@ -91,16 +91,12 @@ export default function Login(): React.JSX.Element {
 
         <div className="panel-right panel-overlay">
           {/* <div className="panel-overlay" /> */}
-          <img
+          {/* <img
             className="building-bg"
-            src="https://scontent.fmnl45-1.fna.fbcdn.net/v/t1.15752-9/377284142_2389733254543841_7288138596334112928_n.jpg?_nc_cat=105&ccb=1-7&_nc_sid=9f807c&_nc_eui2=AeEmwxZ_lMI53AbFy4ThEV6v3BFRIKcXfzPcEVEgpxd_M4qPVYO7cSSNgLz9vKkAcbhMXS4bdnui0g8nzkN3CHhU&_nc_ohc=azlHAcvLd-EQ7kNvwGnPDl0&_nc_oc=AdlUB1tmlhylNraxR7Gqw3Py6y0bS6rjcrGaXgA77n09o_D3dpzACzkbTkR2z766ZgYNRQEQbDH87ebq9jtPQd98&_nc_zt=23&_nc_ht=scontent.fmnl45-1.fna&_nc_ss=8&oh=03_Q7cD4wFSDtK99cvzHiUVqFArwcw8o6yjZ14eqc-F3w5qJ5X2TA&oe=69DED7DE"
+            src="images/city-hall.jpg"
             alt="City Hall"
-          />
-          <img
-            className="map-svg"
-            src="https://scontent.fmnl45-2.fna.fbcdn.net/v/t1.15752-9/649303634_936146618812411_5783272993715675569_n.png?stp=dst-png_s2048x2048&_nc_cat=107&ccb=1-7&_nc_sid=9f807c&_nc_eui2=AeGL1pGb7oHV4L9yUsQUaRMPBjmZT4KlbD4GOZlPgqVsPhCDUtO8uZ-czIs9Gi-3jlDBBkPxaH6wAc821rvIR9eS&_nc_ohc=fFx7xLJ_SGQQ7kNvwEnDpW1&_nc_oc=AdkqTpVRpTKOl5ZV6z0CF7_gOeJey5frrO3_WWwkJ7dWKGG-dIuWW7m_lsKqMParPyP8J1GkwJw1NqfpsFFGOtih&_nc_zt=23&_nc_ht=scontent.fmnl45-2.fna&_nc_ss=8&oh=03_Q7cD4wGF0nAFWCOTCndxBmAW4Kbz3iPOO4xD0Gu5cuxdlpUGCg&oe=69DED14D"
-            alt="Map"
-          />
+          /> */}
+          <img className="map-svg" src="images/pq-map.png" alt="Map" />
         </div>
       </main>
 
@@ -118,6 +114,7 @@ export default function Login(): React.JSX.Element {
 
           min-height: calc(100vh - 84px);
           display: flex;
+          width: 100%;
           flex-direction: column;
           background: var(--green-bg);
           font-family: "Lato", sans-serif;
@@ -166,6 +163,7 @@ export default function Login(): React.JSX.Element {
           align-items: center;
           justify-content: center;
           height: 100%;
+          width: 100%;
           // padding: 0 20px;
         }
 
@@ -185,7 +183,7 @@ export default function Login(): React.JSX.Element {
         }
 
         .panel-left {
-          padding: 44px 40px 36px;
+          // padding: 44px 40px 36px;
           display: flex;
           flex-direction: column;
           height: 100vh;
@@ -283,27 +281,30 @@ export default function Login(): React.JSX.Element {
 
         .panel-right {
           position: relative;
-          height 100%;
+          height: 100vh;
           display: flex;
           align-items: center;
           flex: 1;
           justify-content: center;
           overflow: hidden;
-          background: #eefpan;
+          // background: #eefpan;
+          background: url("images/city-hall.jpg");
+          background-position: center;
+          background-size: cover;
         }
 
-        .panel-right::before {
-          content: "";
-          position: absolute;
-          width: 50%;
-          background: rgba(234, 255, 238, 0.45);
-          z-index: 1;
-        }
-
+        // .panel-right::before {
+        //   content: "";
+        //   position: absolute;
+        //   width: 50%;
+        //   background: rgba(234, 255, 238, 0.45);
+        //   z-index: 1;
+        //   height: 100%;
+        // }
 
         .building-bg {
           position: absolute;
-          // inset: 0;
+          inset: 0;
           width: 100%;
           height: 100%;
           object-fit: cover;
@@ -313,9 +314,11 @@ export default function Login(): React.JSX.Element {
         }
 
         .panel-overlay {
-          border-image: fill 0 linear-gradient(
-          rgba(234, 255, 238, .45),
-            rgba(234, 255, 238, .45)); 
+          border-image: fill 0
+            linear-gradient(
+              rgba(234, 255, 238, 0.45),
+              rgba(234, 255, 238, 0.45)
+            );
           // z-index: 2;
         }
 

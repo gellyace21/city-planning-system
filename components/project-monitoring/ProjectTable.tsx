@@ -400,7 +400,7 @@ export default function ProjectTable({
   };
 
   return (
-    <div className="min-h-screen relative">
+    <div className="min-h-screen relative p-20">
       <div
         className={`max-w-screen mx-auto px-12 py-12 space-y-4 duration-200 ease-in-out ${showHistory ? "mr-74 w-[85vw]" : "mr-0 w-[90vw]"}`}
       >

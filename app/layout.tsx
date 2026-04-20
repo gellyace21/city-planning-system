@@ -4,6 +4,7 @@ import "@/app/globals.css";
 import Footer from "../components/layout/footer";
 import Nav from "../components/layout/navbar";
 import { cn } from "@/lib/utils";
+import { AuthProvider } from "./providers";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -32,11 +33,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased `}
       >
-        <Nav />
-        <main className="flex min-h-screen flex-col items-center justify-start gap-12 relative p-24">
-          {children}
-        </main>
-        <Footer />
+        <AuthProvider>
+          <Nav />
+          <main className="flex min-h-screen flex-col items-center justify-start gap-12 relative">
+            {children}
+          </main>
+          <Footer />
+        </AuthProvider>
       </body>
     </html>
   );
