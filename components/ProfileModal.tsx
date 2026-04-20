@@ -20,6 +20,15 @@ export default function ProfileModal({
   const [profilePhoto, setProfilePhoto] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordValues, setShowPasswordValues] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const passwordsMatch =
+    password.length > 0 &&
+    confirmPassword.length > 0 &&
+    password === confirmPassword;
 
   // Get admin ID from session or props
   const currentAdminId = adminId || (session?.user?.id as number);
@@ -61,10 +70,50 @@ export default function ProfileModal({
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (showPassword) {
+      if (!currentPassword.trim()) {
+        setError("Please enter your current password.");
+        return;
+      }
+
+      if (!password.trim()) {
+        setError("Please enter a new password.");
+        return;
+      }
+
+      if (password.length < 8) {
+        setError("Password must be at least 8 characters.");
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        setError("New password and confirm password do not match.");
+        return;
+      }
+    }
+
     setLoading(true);
     setError("");
 
     try {
+      if (showPassword) {
+        const passwordResponse = await fetch("/api/profile/password", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: currentAdminId,
+            currentPassword,
+            newPassword: password,
+          }),
+        });
+
+        if (!passwordResponse.ok) {
+          const passwordError = await passwordResponse.json().catch(() => null);
+          throw new Error(passwordError?.error || "Failed to update password");
+        }
+      }
+
       const response = await fetch("/api/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -81,6 +130,11 @@ export default function ProfileModal({
 
       const data = await response.json();
       console.log("Profile updated:", data);
+      setCurrentPassword("");
+      setPassword("");
+      setConfirmPassword("");
+      setShowPassword(false);
+      setShowPasswordValues(false);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save profile");
@@ -220,6 +274,7 @@ export default function ProfileModal({
         .profile-right {
           flex: 1;
           padding: 40px 32px;
+          width: 50%;
           display: flex;
           flex-direction: column;
           justify-content: center;
@@ -228,6 +283,7 @@ export default function ProfileModal({
         .profile-form {
           display: flex;
           flex-direction: column;
+          position: relative;
           gap: 16px;
         }
 
@@ -253,6 +309,7 @@ export default function ProfileModal({
           font-family: "DM Sans", sans-serif;
           color: #1a2e2b;
           outline: none;
+          max-width: 100%;
           transition:
             border 0.2s,
             background 0.2s;
@@ -261,6 +318,54 @@ export default function ProfileModal({
         .form-group input:focus {
           border-color: #2a9d8f;
           background: #f0fffe;
+        }
+
+        .password-controls {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .toggle-password-btn {
+          border: 1px solid #cfe3df;
+          background: #f5fbfa;
+          color: #1a2e2b;
+          border-radius: 6px;
+          padding: 8px 12px;
+          font-size: 0.85rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition:
+            background 0.2s,
+            border-color 0.2s,
+            color 0.2s;
+        }
+
+        .toggle-password-btn:hover {
+          background: #ebf7f5;
+          border-color: #2a9d8f;
+          color: #16433d;
+        }
+
+        .password-match {
+          font-size: 0.85rem;
+          font-weight: 600;
+          border-radius: 999px;
+          padding: 6px 10px;
+          line-height: 1;
+          white-space: nowrap;
+        }
+
+        .password-match.ok {
+          color: #116149;
+          background: #e7f7ef;
+        }
+
+        .password-match.not-ok {
+          color: #9d2d2d;
+          background: #fdecec;
         }
 
         .form-actions {
@@ -280,6 +385,7 @@ export default function ProfileModal({
           cursor: pointer;
           transition: all 0.2s;
           font-family: "DM Sans", sans-serif;
+          text-align: center;
         }
 
         .btn-cancel {
@@ -343,7 +449,7 @@ export default function ProfileModal({
                 }
                 alt="Profile Photo"
               />
-              <div
+              {/* <div
                 className="edit-icon"
                 onClick={() => document.getElementById("photoInput")?.click()}
               >
@@ -355,7 +461,7 @@ export default function ProfileModal({
                   <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" />
                   <path d="M20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
                 </svg>
-              </div>
+              </div> */}
             </div>
             <button
               className="upload-btn"
@@ -417,6 +523,70 @@ export default function ProfileModal({
                 placeholder="Email Address"
               />
             </div>
+            <div
+              className="btn-save"
+              role="button"
+              tabIndex={0}
+              onClick={() => setShowPassword((prev) => !prev)}
+            >
+              {showPassword ? "Close Change Password" : "Change Password"}
+            </div>
+            {showPassword ? (
+              <>
+                <div className="password-controls">
+                  <button
+                    type="button"
+                    className="toggle-password-btn"
+                    onClick={() => setShowPasswordValues((prev) => !prev)}
+                  >
+                    {showPasswordValues ? "Hide Passwords" : "Show Passwords"}
+                  </button>
+
+                  {password.length > 0 || confirmPassword.length > 0 ? (
+                    <span
+                      className={`password-match ${passwordsMatch ? "ok" : "not-ok"}`}
+                    >
+                      {passwordsMatch
+                        ? "Passwords match"
+                        : "Passwords do not match"}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="currentPassword">Current Password</label>
+                  <input
+                    type={showPasswordValues ? "text" : "password"}
+                    id="currentPassword"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Current Password"
+                  />
+                </div>
+                <div className="flex w-full gap-2 [&>div]:flex-1 [&>div]:min-w-0">
+                  <div className="form-group">
+                    <label htmlFor="newPassword">New Password</label>
+                    <input
+                      type={showPasswordValues ? "text" : "password"}
+                      id="newPassword"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="New Password"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="confirmPassword">Confirm Password</label>
+                    <input
+                      type={showPasswordValues ? "text" : "password"}
+                      id="confirmPassword"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm Password"
+                    />
+                  </div>
+                </div>
+              </>
+            ) : null}
 
             <div className="form-actions">
               <button
