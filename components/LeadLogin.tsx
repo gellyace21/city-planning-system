@@ -3,9 +3,9 @@ import { getSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export default function Login(): React.JSX.Element {
+export default function LeadLogin(): React.JSX.Element {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -20,7 +20,7 @@ export default function Login(): React.JSX.Element {
     try {
       const res = await signIn("credentials", {
         redirect: false,
-        email,
+        email: username,
         password,
       });
 
@@ -32,11 +32,12 @@ export default function Login(): React.JSX.Element {
       const session = await getSession();
       const role = session?.user?.role;
 
-      if (role === "superadmin") {
-        router.replace("/dashboard/superadmin");
-      } else if (role === "admin") {
-        router.replace("/dashboard");
+      if (role === "lead") {
+        router.replace("/dashboard/annual-investment-plan");
+        return;
       }
+
+      setError("This login is for lead accounts only.");
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -57,15 +58,15 @@ export default function Login(): React.JSX.Element {
           </div>
 
           <h2 className="welcome-title">Welcome!</h2>
-          <p className="welcome-sub">Please login to continue</p>
+          <p className="welcome-sub">Please enter your username to continue</p>
 
           <form onSubmit={handleSubmit} className="login-form">
             <div className="form-group">
               <input
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => setUsername(e.target.value)}
                 type="text"
-                name="email"
-                placeholder="Email"
+                name="username"
+                placeholder="Username"
                 required
               />
             </div>
@@ -84,13 +85,7 @@ export default function Login(): React.JSX.Element {
           </form>
           {error !== "" ? <p className="text-red-400">{error}</p> : null}
           <p className="register-link">
-            No account yet? <a href="/register">Register</a>
-          </p>
-          <p className="register-link">
-            Are you a lead? <a href="/lead-login">Lead login</a>
-          </p>
-          <p className="register-link">
-            Super Admin? <a href="/superadmin-login">Super admin login</a>
+            Need admin access? <a href="/login">Login</a>
           </p>
         </div>
 
@@ -117,12 +112,24 @@ export default function Login(): React.JSX.Element {
           --text-muted: #5a8070;
           --input-border: #a8d0bf;
 
-          min-height: 100%;
+          min-height: calc(100vh - 84px);
           display: flex;
           width: 100%;
           flex-direction: column;
           background: var(--green-bg);
           font-family: "Lato", sans-serif;
+        }
+
+        .header-logo {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          background: var(--white);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+          flex-shrink: 0;
         }
 
         .seal-img {
@@ -132,6 +139,14 @@ export default function Login(): React.JSX.Element {
           object-position: center;
         }
 
+        .fp2-header h1 {
+          font-weight: 700;
+          font-size: 13px;
+          letter-spacing: 1.5px;
+          text-transform: uppercase;
+          color: var(--white);
+        }
+
         .fp2-main {
           flex: 1;
           display: flex;
@@ -139,7 +154,6 @@ export default function Login(): React.JSX.Element {
           justify-content: center;
           height: 100%;
           width: 100%;
-          // padding: 0 20px;
         }
 
         .card {
@@ -158,13 +172,12 @@ export default function Login(): React.JSX.Element {
         }
 
         .panel-left {
-          // padding: 44px 40px 36px;
           display: flex;
           flex-direction: column;
           height: 100vh;
           width: 50%;
           align-items: center;
-          justify-content: flex-start;
+          justify-content: center;
           justify-self: flex-end;
           z-index: 1;
           background: #eaffee;
@@ -178,7 +191,6 @@ export default function Login(): React.JSX.Element {
           margin-bottom: 16px;
           overflow: hidden;
           box-shadow: 0 4px 14px rgba(76, 175, 138, 0.2);
-          margin-top: 8rem;
         }
 
         .welcome-title {
@@ -263,20 +275,10 @@ export default function Login(): React.JSX.Element {
           flex: 1;
           justify-content: center;
           overflow: hidden;
-          // background: #eefpan;
           background: url("images/city-hall.jpg");
           background-position: center;
           background-size: cover;
         }
-
-        // .panel-right::before {
-        //   content: "";
-        //   position: absolute;
-        //   width: 50%;
-        //   background: rgba(234, 255, 238, 0.45);
-        //   z-index: 1;
-        //   height: 100%;
-        // }
 
         .building-bg {
           position: absolute;
@@ -295,7 +297,6 @@ export default function Login(): React.JSX.Element {
               rgba(234, 255, 238, 0.45),
               rgba(234, 255, 238, 0.45)
             );
-          // z-index: 2;
         }
 
         .map-svg {

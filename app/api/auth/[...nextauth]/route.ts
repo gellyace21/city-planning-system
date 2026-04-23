@@ -8,6 +8,13 @@ import { Admin, Lead } from "@/types/user";
 import { Session } from "next-auth";
 import { JWT } from "next-auth/jwt";
 
+type AuthUser = {
+  id: number;
+  role: string;
+  profile_pic?: string;
+  department?: string;
+};
+
 declare module "next-auth" {
   interface Session {
     user: {
@@ -35,7 +42,7 @@ export const authOptions: AuthOptions = {
         const dbPath = path.join(process.cwd(), "db.json");
         const db = JSON.parse(readFileSync(dbPath, "utf-8"));
 
-        let superadmin = db.admins.find(
+        const superadmin = db.admins.find(
           (u: Admin) =>
             u.email === credentials.email && u.is_superadmin === true,
         );
@@ -108,7 +115,7 @@ export const authOptions: AuthOptions = {
       }
       return session;
     },
-    async jwt({ token, user }: { token: JWT; user?: any }) {
+    async jwt({ token, user }: { token: JWT; user?: AuthUser }) {
       if (user) {
         token.id = user.id;
         token.role = user.role;

@@ -1,15 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AvatarDropdown } from "./avatar-dropdown";
-import { Cinzel } from "next/font/google";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-
-const merriweather = Cinzel({
-  subsets: ["latin"],
-});
 
 const Navbar = () => {
   const pathname = usePathname();
@@ -52,21 +48,21 @@ const Navbar = () => {
                 <li
                   className={`h-full ${pathname === "/dashboard/project-monitoring" ? "bg-background text-black" : "text-white"}`}
                 >
-                  <a href="/dashboard/project-monitoring">Project Monitoring</a>
+                  <Link href="/dashboard/project-monitoring">Project Monitoring</Link>
                 </li>
               ) : null}
               <li
                 className={`h-full ${pathname === "/dashboard/annual-investment-plan" ? "bg-background text-black" : "text-white"}`}
               >
-                <a href="/dashboard/annual-investment-plan">
+                <Link href="/dashboard/annual-investment-plan">
                   {isLead ? "Workspace" : "Annual Investment"}
-                </a>
+                </Link>
               </li>
               {!isLead ? (
                 <li
                   className={`h-full ${pathname === "/" ? "bg-background text-black" : "text-white"}`}
                 >
-                  <a href="/">Home</a>
+                  <Link href="/">Home</Link>
                 </li>
               ) : null}
             </ul>

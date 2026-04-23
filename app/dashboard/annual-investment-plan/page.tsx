@@ -13,7 +13,11 @@ const page = async ({
 }) => {
   const session = await getServerSession(authOptions);
   const role = session?.user?.role;
-  if (role !== "admin" && role !== "superadmin" && role !== "lead") {
+  if (role === "superadmin") {
+    redirect("/dashboard/superadmin");
+  }
+
+  if (role !== "admin" && role !== "lead") {
     redirect("/login");
   }
 

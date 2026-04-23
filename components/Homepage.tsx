@@ -15,10 +15,12 @@ export default function Homepage(): React.JSX.Element {
           padding: 0 20px 60px;
           display: flex;
           flex-direction: column;
-          align-items: flex-start;
+          align-items: center;
+          height: auto;
           justify-content: center;
-          gap: 36px;
+          gap: 4rem;
           background: #eaf7f0;
+          width: 100%'
           font-family: "Lato", sans-serif;
         }
 
@@ -26,6 +28,7 @@ export default function Homepage(): React.JSX.Element {
           display: flex;
           gap: 28px;
           flex-wrap: wrap;
+          margin: 2rem auto 2rem auto;
           justify-content: center;
         }
 
@@ -206,7 +209,9 @@ export default function Homepage(): React.JSX.Element {
         </div> */}
       </section>
 
-      <LeadLinksManager />
+      <section>
+        <LeadLinksManager />
+      </section>
     </main>
   );
 }

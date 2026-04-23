@@ -36,17 +36,22 @@ export interface UserProfileResponse {
   department?: string;
 }
 
-async function readDb(): Promise<any> {
+interface DbShape {
+  admins?: AdminProfile[];
+  leads?: LeadProfile[];
+}
+
+async function readDb(): Promise<DbShape> {
   try {
     const data = await fs.readFile(DB_PATH, "utf-8");
-    return JSON.parse(data);
+    return JSON.parse(data) as DbShape;
   } catch (error) {
     console.error("Error reading db.json:", error);
-    return { admins: [] };
+    return { admins: [], leads: [] };
   }
 }
 
-async function writeDb(data: any): Promise<void> {
+async function writeDb(data: DbShape): Promise<void> {
   try {
     await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2), "utf-8");
   } catch (error) {

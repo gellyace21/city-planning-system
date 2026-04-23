@@ -1,5 +1,6 @@
 export interface AIPRow {
   id: number;
+  year?: number;
   lead_id?: number;
   upload_id?: number;
   sector: string;
@@ -22,6 +23,7 @@ export interface AIPRow {
 
 export interface MonitoringRow {
   id: number;
+  year?: number;
   project_name: string;
   agency: string;
   location: string;
@@ -55,6 +57,44 @@ export interface EditHistoryEntry {
   edited_at: string;
   action_type: "edit" | "add" | "delete";
   row_snapshot?: string | null;
+}
+
+export type CommentEntity = "aip_rows" | "monitoring_rows";
+
+export interface CommentEntry {
+  id: number;
+  project_id: number;
+  entity_name: CommentEntity;
+  row_id: number;
+  column_name: string;
+  comment_text: string;
+  created_by_id: number;
+  created_by_role: "admin" | "superadmin" | "lead";
+  created_by_name: string;
+  created_by_avatar?: string;
+  created_at: string;
+}
+
+export interface NotificationEntry {
+  id: number;
+  recipient_id: number;
+  recipient_role: "admin" | "superadmin" | "lead";
+  actor_id: number;
+  actor_role: "admin" | "superadmin" | "lead";
+  actor_name: string;
+  actor_avatar?: string;
+  message: string;
+  entity_name: CommentEntity;
+  row_id: number;
+  column_name: string;
+  created_at: string;
+  read_at?: string | null;
+}
+
+export interface CommentThreadSummary {
+  total: number;
+  byCell: Record<string, number>;
+  byRow: Record<string, number>;
 }
 
 export type SortKey = keyof AIPRow | null;

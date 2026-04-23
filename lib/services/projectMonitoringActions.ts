@@ -9,7 +9,10 @@ import {
 } from "@/components/project-monitoring/types";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import {
+  addCommentToEntity,
   ActorContext,
+  getActorNotifications,
+  getCommentsForEntity,
   createAipRow,
   createMonitoringRow,
   deleteAipRows,
@@ -18,12 +21,17 @@ import {
   getLeadUploadedFiles,
   LeadFileSummary,
   LeadUploadInputRow,
+  markNotificationAsRead,
   reviewAipSuggestion,
   restoreHistoryEntry,
   uploadLeadAipRows,
   updateAipRowField,
   updateMonitoringRowField,
 } from "@/lib/services/projectMonitoringService";
+import {
+  CommentEntry,
+  NotificationEntry,
+} from "@/components/project-monitoring/types";
 
 const PAGE_PATH = "/dashboard/project-monitoring";
 
@@ -35,11 +43,11 @@ const requireActor = async (): Promise<ActorContext> => {
     throw new Error("You must be signed in to continue.");
   }
 
-  if (role !== "admin" && role !== "superadmin" && role !== "lead") {
+  if (role !== "admin" && role !== "lead") {
     throw new Error("Unsupported role.");
   }
 
-  return { id, role };
+  return { id, role: role as "admin" | "lead" };
 };
 
 export async function fetchProjectMonitoringDataAction(): Promise<{
@@ -153,4 +161,39 @@ export async function reviewAipSuggestionAction(
   revalidatePath(PAGE_PATH);
   revalidatePath("/dashboard/annual-investment-plan");
   return entry;
+}
+
+export async function fetchCommentsAction(
+  entity: "aip_rows" | "monitoring_rows",
+): Promise<CommentEntry[]> {
+  const actor = await requireActor();
+  return getCommentsForEntity(actor, entity);
+}
+
+export async function addCommentAction(payload: {
+  entity_name: "aip_rows" | "monitoring_rows";
+  row_id: number;
+  column_name: string;
+  comment_text: string;
+}): Promise<CommentEntry> {
+  const actor = await requireActor();
+  const entry = await addCommentToEntity(actor, payload);
+  revalidatePath(PAGE_PATH);
+  revalidatePath("/dashboard/annual-investment-plan");
+  return entry;
+}
+
+export async function fetchNotificationsAction(): Promise<NotificationEntry[]> {
+  const actor = await requireActor();
+  return getActorNotifications(actor);
+}
+
+export async function markNotificationReadAction(
+  notificationId: number,
+): Promise<NotificationEntry> {
+  const actor = await requireActor();
+  const updated = await markNotificationAsRead(actor, notificationId);
+  revalidatePath(PAGE_PATH);
+  revalidatePath("/dashboard/annual-investment-plan");
+  return updated;
 }

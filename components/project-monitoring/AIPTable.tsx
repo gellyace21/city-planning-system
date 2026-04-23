@@ -4,6 +4,7 @@ import React, { FC, KeyboardEvent } from "react";
 import { AIPRow, EditCell, SortDir, SortKey } from "./types";
 import { fmt } from "./utils";
 import SectorBadge from "./SectorBadge";
+import { IconMessageCircle } from "@tabler/icons-react";
 
 interface AIPTableProps {
   filtered: AIPRow[];
@@ -27,6 +28,9 @@ interface AIPTableProps {
   sortCol: SortKey;
   sortDir: SortDir;
   cellStatuses: Record<string, "pending" | "approved" | "rejected">;
+  commentCountsByCell: Record<string, number>;
+  commentCountsByRow: Record<string, number>;
+  onOpenComments: (rowId: number, field: keyof AIPRow | "__row__") => void;
   focusedRowId?: number | null;
 }
 
@@ -46,6 +50,9 @@ export default function AIPTable({
   sortCol,
   sortDir,
   cellStatuses,
+  commentCountsByCell,
+  commentCountsByRow,
+  onOpenComments,
   focusedRowId,
 }: AIPTableProps): React.JSX.Element {
   // ── Sub-components ──
@@ -67,6 +74,7 @@ export default function AIPTable({
     const isActive = editCell?.rowId === row.id && editCell?.field === field;
     const value = row[field];
     const status = cellStatuses[`${row.id}:${String(field)}`];
+    const commentCount = commentCountsByCell[`${row.id}:${String(field)}`] ?? 0;
     const statusClass =
       status === "pending"
         ? "bg-sky-100/70"
@@ -75,10 +83,11 @@ export default function AIPTable({
           : status === "rejected"
             ? "bg-rose-50/80"
             : "";
+    const commentClass = commentCount > 0 ? "ring-1 ring-amber-300/70" : "";
 
     if (readOnly) {
       return (
-        <td className={`${className} ${statusClass}`}>
+        <td className={`${className} ${statusClass} ${commentClass}`}>
           <span className="font-bold text-sky-700">{fmt(value as number)}</span>
         </td>
       );
@@ -86,7 +95,7 @@ export default function AIPTable({
 
     if (isActive) {
       return (
-        <td className={`${className} ${statusClass}`}>
+        <td className={`${className} ${statusClass} ${commentClass}`}>
           <input
             autoFocus
             type={numeric ? "number" : "text"}
@@ -102,7 +111,7 @@ export default function AIPTable({
 
     return (
       <td
-        className={`${className} ${statusClass} cursor-pointer group`}
+        className={`${className} ${statusClass} ${commentClass} cursor-pointer group`}
         onDoubleClick={() => startEdit(row.id, field, value)}
         title="Double-click to edit"
       >
@@ -122,6 +131,11 @@ export default function AIPTable({
                     : "bg-rose-500"
               }`}
             />
+          )}
+          {commentCount > 0 && (
+            <span className="ml-1 inline-flex min-w-4 h-4 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold items-center justify-center">
+              {commentCount}
+            </span>
           )}
         </span>
       </td>
@@ -189,6 +203,7 @@ export default function AIPTable({
             <col style={{ width: "5%" }} />
             <col style={{ width: "5%" }} />
             <col style={{ width: "3%" }} />
+            <col style={{ width: "2%" }} />
           </colgroup>
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200 text-gray-600">
@@ -230,6 +245,7 @@ export default function AIPTable({
               >
                 Climate Change Expenditure
               </th>
+              <th className="bg-transparent border-0 px-0 py-2" />
             </tr>
             <tr className="bg-gray-50 border-b-2 border-gray-300 text-gray-500 text-xs">
               <th colSpan={8} />
@@ -253,13 +269,14 @@ export default function AIPTable({
                   {renderSortIcon(col)}
                 </th>
               ))}
+              <th />
             </tr>
           </thead>
 
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={16} className="text-center py-16 text-gray-400">
+                <td colSpan={17} className="text-center py-16 text-gray-400">
                   No records found.
                 </td>
               </tr>
@@ -461,6 +478,21 @@ export default function AIPTable({
                     field="ccCode"
                     className="px-1.5 py-1.5 text-center text-[11px]"
                   />
+                  <td className="relative w-0 overflow-visible group border-0 bg-transparent px-0 py-1.5">
+                    <button
+                      type="button"
+                      className="h-full inline-flex w-7 items-center justify-center rounded text-gray-400 transition-colors group-hover:text-sky-600"
+                      title="Comments"
+                      onClick={() => onOpenComments(row.id, "__row__")}
+                    >
+                      <IconMessageCircle size={16} />
+                      {(commentCountsByRow[String(row.id)] ?? 0) > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 inline-flex min-w-4 h-4 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold items-center justify-center">
+                          {commentCountsByRow[String(row.id)]}
+                        </span>
+                      )}
+                    </button>
+                  </td>
                 </tr>
               );
             })}

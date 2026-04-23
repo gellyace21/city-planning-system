@@ -1,9 +1,10 @@
 "use client";
-import { getSession, signIn } from "next-auth/react";
+
+import { getSession, signIn, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export default function Login(): React.JSX.Element {
+export default function SuperadminLogin(): React.JSX.Element {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,9 +35,11 @@ export default function Login(): React.JSX.Element {
 
       if (role === "superadmin") {
         router.replace("/dashboard/superadmin");
-      } else if (role === "admin") {
-        router.replace("/dashboard");
+        return;
       }
+
+      await signOut({ redirect: false });
+      setError("This login is for super admin accounts only.");
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -56,16 +59,16 @@ export default function Login(): React.JSX.Element {
             />
           </div>
 
-          <h2 className="welcome-title">Welcome!</h2>
-          <p className="welcome-sub">Please login to continue</p>
+          <h2 className="welcome-title">Super Admin Portal</h2>
+          <p className="welcome-sub">Sign in to manage admin accounts</p>
 
           <form onSubmit={handleSubmit} className="login-form">
             <div className="form-group">
               <input
                 onChange={(e) => setEmail(e.target.value)}
-                type="text"
+                type="email"
                 name="email"
-                placeholder="Email"
+                placeholder="Super admin email"
                 required
               />
             </div>
@@ -79,28 +82,17 @@ export default function Login(): React.JSX.Element {
               />
             </div>
             <button className="btn-login" type="submit">
-              Login
+              {loading ? "Signing in..." : "Login"}
             </button>
           </form>
+
           {error !== "" ? <p className="text-red-400">{error}</p> : null}
           <p className="register-link">
-            No account yet? <a href="/register">Register</a>
-          </p>
-          <p className="register-link">
-            Are you a lead? <a href="/lead-login">Lead login</a>
-          </p>
-          <p className="register-link">
-            Super Admin? <a href="/superadmin-login">Super admin login</a>
+            Back to regular login? <a href="/login">Login</a>
           </p>
         </div>
 
         <div className="panel-right panel-overlay">
-          {/* <div className="panel-overlay" /> */}
-          {/* <img
-            className="building-bg"
-            src="images/city-hall.jpg"
-            alt="City Hall"
-          /> */}
           <img className="map-svg" src="images/pq-map.png" alt="Map" />
         </div>
       </main>
@@ -117,7 +109,7 @@ export default function Login(): React.JSX.Element {
           --text-muted: #5a8070;
           --input-border: #a8d0bf;
 
-          min-height: 100%;
+          min-height: calc(100vh - 84px);
           display: flex;
           width: 100%;
           flex-direction: column;
@@ -139,33 +131,15 @@ export default function Login(): React.JSX.Element {
           justify-content: center;
           height: 100%;
           width: 100%;
-          // padding: 0 20px;
-        }
-
-        .card {
-          background: var(--white);
-          border-radius: 16px;
-          box-shadow:
-            0 8px 40px rgba(46, 125, 98, 0.15),
-            0 2px 8px rgba(0, 0, 0, 0.06);
-          width: 80%;
-          max-width: 90%;
-          min-height: 90%;
-          height: calc(100vh - 17rem);
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          overflow: hidden;
         }
 
         .panel-left {
-          // padding: 44px 40px 36px;
           display: flex;
           flex-direction: column;
           height: 100vh;
           width: 50%;
           align-items: center;
-          justify-content: flex-start;
-          justify-self: flex-end;
+          justify-content: center;
           z-index: 1;
           background: #eaffee;
         }
@@ -178,7 +152,6 @@ export default function Login(): React.JSX.Element {
           margin-bottom: 16px;
           overflow: hidden;
           box-shadow: 0 4px 14px rgba(76, 175, 138, 0.2);
-          margin-top: 8rem;
         }
 
         .welcome-title {
@@ -221,17 +194,10 @@ export default function Login(): React.JSX.Element {
           outline: none;
         }
 
-        .form-group input:focus {
-          border-color: var(--green-mid);
-          box-shadow: 0 0 0 3px rgba(76, 175, 138, 0.15);
-          background: var(--white);
-        }
-
         .btn-login {
           width: 50%;
           padding: 11px;
           margin-top: 6px;
-          justify-self: center;
           background: var(--green-dark);
           color: var(--white);
           border: none;
@@ -240,7 +206,6 @@ export default function Login(): React.JSX.Element {
           font-weight: 700;
           letter-spacing: 1px;
           cursor: pointer;
-          box-shadow: 0 4px 12px rgba(46, 125, 98, 0.3);
         }
 
         .register-link {
@@ -263,30 +228,9 @@ export default function Login(): React.JSX.Element {
           flex: 1;
           justify-content: center;
           overflow: hidden;
-          // background: #eefpan;
           background: url("images/city-hall.jpg");
           background-position: center;
           background-size: cover;
-        }
-
-        // .panel-right::before {
-        //   content: "";
-        //   position: absolute;
-        //   width: 50%;
-        //   background: rgba(234, 255, 238, 0.45);
-        //   z-index: 1;
-        //   height: 100%;
-        // }
-
-        .building-bg {
-          position: absolute;
-          inset: 0;
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          object-position: center;
-          filter: saturate(1.1) contrast(1.02);
-          z-index: 0;
         }
 
         .panel-overlay {
@@ -295,17 +239,12 @@ export default function Login(): React.JSX.Element {
               rgba(234, 255, 238, 0.45),
               rgba(234, 255, 238, 0.45)
             );
-          // z-index: 2;
         }
 
         .map-svg {
           position: relative;
           z-index: 2;
           width: min(90%, 380px);
-          filter: brightness(1.07) saturate(1.8)
-            drop-shadow(0 12px 28px rgba(0, 70, 70, 0.35)) invert(85%)
-            sepia(10%) saturate(2027%) hue-rotate(137deg) brightness(83%)
-            contrast(81%);
           opacity: 90%;
           animation: float 4s ease-in-out infinite;
         }
@@ -317,16 +256,6 @@ export default function Login(): React.JSX.Element {
           }
           50% {
             transform: translateY(-10px);
-          }
-        }
-
-        @media (max-width: 900px) {
-          .card {
-            grid-template-columns: 1fr;
-          }
-
-          .panel-right {
-            min-height: 280px;
           }
         }
       `}</style>

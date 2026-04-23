@@ -4,8 +4,10 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import {
   AIPRow,
+  CommentEntry,
   EditHistoryEntry,
   MonitoringRow,
+  NotificationEntry,
 } from "@/components/project-monitoring/types";
 
 const DB_PATH = path.join(process.cwd(), "db.json");
@@ -15,7 +17,26 @@ interface DbShape {
   monitoring_rows?: RawMonitoringRow[];
   edit_history?: RawEditHistoryEntry[];
   lead_files?: RawLeadFile[];
+  comments?: RawCommentEntry[];
+  notifications?: RawNotificationEntry[];
+  admins?: RawAdminUser[];
+  leads?: RawLeadUser[];
   [key: string]: unknown;
+}
+
+interface RawAdminUser {
+  id: number;
+  name: string;
+  email: string;
+  profile_pic?: string;
+  is_superadmin?: boolean;
+}
+
+interface RawLeadUser {
+  id: number;
+  username: string;
+  department?: string;
+  profile_pic?: string;
 }
 
 export interface ActorContext {
@@ -92,6 +113,36 @@ interface RawLeadFile {
   row_count: number;
 }
 
+interface RawCommentEntry {
+  id: number;
+  project_id: number;
+  entity_name: "aip_rows" | "monitoring_rows";
+  row_id: number;
+  column_name: string;
+  comment_text: string;
+  created_by_id: number;
+  created_by_role: "admin" | "superadmin" | "lead";
+  created_by_name: string;
+  created_by_avatar?: string;
+  created_at: string;
+}
+
+interface RawNotificationEntry {
+  id: number;
+  recipient_id: number;
+  recipient_role: "admin" | "superadmin" | "lead";
+  actor_id: number;
+  actor_role: "admin" | "superadmin" | "lead";
+  actor_name: string;
+  actor_avatar?: string;
+  message: string;
+  entity_name: "aip_rows" | "monitoring_rows";
+  row_id: number;
+  column_name: string;
+  created_at: string;
+  read_at?: string | null;
+}
+
 const DEFAULT_PROJECT_ID = 1;
 const DEFAULT_ADMIN_ID = 1;
 
@@ -124,6 +175,7 @@ const toStringSafe = (value: unknown): string => {
 
 const toAipRow = (raw: RawAIPRow): AIPRow => ({
   id: toNumber(raw.id),
+  year: raw.year ? toNumber(raw.year) : undefined,
   lead_id: raw.lead_id ? toNumber(raw.lead_id) : undefined,
   upload_id: raw.upload_id ? toNumber(raw.upload_id) : undefined,
   sector: toStringSafe(raw.sector),
@@ -146,6 +198,9 @@ const toAipRow = (raw: RawAIPRow): AIPRow => ({
 
 const toMonitoringRow = (raw: RawMonitoringRow): MonitoringRow => ({
   id: toNumber(raw.id),
+  year: raw.year
+    ? toNumber(raw.year)
+    : toNumber(toStringSafe(raw.certified_date).slice(0, 4)) || undefined,
   project_name: toStringSafe(raw.project_name),
   agency: toStringSafe(raw.agency),
   location: toStringSafe(raw.location),
@@ -201,6 +256,40 @@ const toLeadFileSummary = (raw: RawLeadFile): LeadFileSummary => ({
   file_name: toStringSafe(raw.file_name),
   uploaded_at: toStringSafe(raw.uploaded_at),
   row_count: toNumber(raw.row_count),
+});
+
+const toCommentEntry = (raw: RawCommentEntry): CommentEntry => ({
+  id: toNumber(raw.id),
+  project_id: toNumber(raw.project_id) || DEFAULT_PROJECT_ID,
+  entity_name:
+    raw.entity_name === "monitoring_rows" ? "monitoring_rows" : "aip_rows",
+  row_id: toNumber(raw.row_id),
+  column_name: toStringSafe(raw.column_name) || "__row__",
+  comment_text: toStringSafe(raw.comment_text),
+  created_by_id: toNumber(raw.created_by_id),
+  created_by_role: raw.created_by_role ?? "admin",
+  created_by_name: toStringSafe(raw.created_by_name) || "Unknown",
+  created_by_avatar: toStringSafe(raw.created_by_avatar) || undefined,
+  created_at: toStringSafe(raw.created_at),
+});
+
+const toNotificationEntry = (
+  raw: RawNotificationEntry,
+): NotificationEntry => ({
+  id: toNumber(raw.id),
+  recipient_id: toNumber(raw.recipient_id),
+  recipient_role: raw.recipient_role ?? "admin",
+  actor_id: toNumber(raw.actor_id),
+  actor_role: raw.actor_role ?? "admin",
+  actor_name: toStringSafe(raw.actor_name) || "Unknown",
+  actor_avatar: toStringSafe(raw.actor_avatar) || undefined,
+  message: toStringSafe(raw.message),
+  entity_name:
+    raw.entity_name === "monitoring_rows" ? "monitoring_rows" : "aip_rows",
+  row_id: toNumber(raw.row_id),
+  column_name: toStringSafe(raw.column_name) || "__row__",
+  created_at: toStringSafe(raw.created_at),
+  read_at: raw.read_at ?? null,
 });
 
 const readDb = async (): Promise<DbShape> => {
@@ -280,6 +369,134 @@ const getMonitoringRows = (db: DbShape): RawMonitoringRow[] => {
 
 const getLeadFiles = (db: DbShape): RawLeadFile[] => {
   return (db.lead_files ?? []) as RawLeadFile[];
+};
+
+const getComments = (db: DbShape): RawCommentEntry[] => {
+  return (db.comments ?? []) as RawCommentEntry[];
+};
+
+const getNotifications = (db: DbShape): RawNotificationEntry[] => {
+  return (db.notifications ?? []) as RawNotificationEntry[];
+};
+
+const getAdmins = (db: DbShape): RawAdminUser[] => {
+  return (db.admins ?? []) as RawAdminUser[];
+};
+
+const getLeads = (db: DbShape): RawLeadUser[] => {
+  return (db.leads ?? []) as RawLeadUser[];
+};
+
+const getActorIdentity = (
+  db: DbShape,
+  actor: ActorContext,
+): { name: string; avatar?: string } => {
+  if (actor.role === "lead") {
+    const lead = getLeads(db).find((item) => toNumber(item.id) === actor.id);
+    return {
+      name: lead?.username || `Lead ${actor.id}`,
+      avatar: lead?.profile_pic,
+    };
+  }
+
+  const admin = getAdmins(db).find((item) => toNumber(item.id) === actor.id);
+  return {
+    name: admin?.name || `Admin ${actor.id}`,
+    avatar: admin?.profile_pic,
+  };
+};
+
+const appendNotification = (
+  db: DbShape,
+  payload: Omit<RawNotificationEntry, "id" | "created_at" | "read_at">,
+): RawNotificationEntry => {
+  const notifications = getNotifications(db);
+  const created: RawNotificationEntry = {
+    id: nextId(notifications),
+    created_at: new Date().toISOString(),
+    read_at: null,
+    ...payload,
+  };
+  notifications.push(created);
+  db.notifications = notifications;
+  return created;
+};
+
+const notifyRelevantUsers = (
+  db: DbShape,
+  actor: ActorContext,
+  payload: {
+    entity_name: "aip_rows" | "monitoring_rows";
+    row_id: number;
+    column_name: string;
+    message: string;
+  },
+): void => {
+  const actorIdentity = getActorIdentity(db, actor);
+  const recipients = new Set<string>();
+
+  if (actor.role === "lead") {
+    for (const admin of getAdmins(db)) {
+      if (admin.is_superadmin) continue;
+      recipients.add(`${toNumber(admin.id)}:admin`);
+    }
+  } else if (payload.entity_name === "aip_rows") {
+    const aipRow = getAipRows(db).find((row) => row.id === payload.row_id);
+    if (aipRow?.lead_id) {
+      recipients.add(`${toNumber(aipRow.lead_id)}:lead`);
+    }
+  }
+
+  for (const key of recipients) {
+    const [idText, roleText] = key.split(":");
+    const recipientId = Number(idText);
+    const recipientRole = roleText as "admin" | "superadmin" | "lead";
+    if (!Number.isFinite(recipientId)) continue;
+    if (recipientId === actor.id && recipientRole === actor.role) continue;
+
+    appendNotification(db, {
+      recipient_id: recipientId,
+      recipient_role: recipientRole,
+      actor_id: actor.id,
+      actor_role: actor.role,
+      actor_name: actorIdentity.name,
+      actor_avatar: actorIdentity.avatar,
+      message: payload.message,
+      entity_name: payload.entity_name,
+      row_id: payload.row_id,
+      column_name: payload.column_name,
+    });
+  }
+};
+
+const notifyOtherAdmins = (
+  db: DbShape,
+  actor: ActorContext,
+  payload: {
+    entity_name: "aip_rows" | "monitoring_rows";
+    row_id: number;
+    column_name: string;
+    message: string;
+  },
+): void => {
+  const actorIdentity = getActorIdentity(db, actor);
+  for (const admin of getAdmins(db)) {
+    if (admin.is_superadmin) continue;
+    const adminId = toNumber(admin.id);
+    if (adminId === actor.id && actor.role === "admin") continue;
+    appendNotification(db, {
+      recipient_id: adminId,
+      recipient_role: "admin",
+      actor_id: actor.id,
+      actor_role: actor.role,
+      actor_name: actorIdentity.name,
+      actor_avatar: actorIdentity.avatar,
+      message: payload.message,
+      entity_name: payload.entity_name,
+      row_id: payload.row_id,
+      column_name: payload.column_name,
+    });
+  }
 };
 
 const isAdminRole = (role: ActorContext["role"]): boolean => {
@@ -475,6 +692,12 @@ export async function createAipRow(actor: ActorContext): Promise<{
     row_snapshot: snapshotRow(row),
   });
   db.aip_rows = rows;
+  notifyRelevantUsers(db, actor, {
+    entity_name: "aip_rows",
+    row_id: row.id,
+    column_name: "__row__",
+    message: "AIP row created.",
+  });
   await writeDb(db);
   return { row: toAipRow(row), historyEntry };
 }
@@ -533,6 +756,12 @@ export async function updateAipRowField(
       action_type: "edit",
     });
     db.aip_rows = rows;
+    notifyRelevantUsers(db, actor, {
+      entity_name: "aip_rows",
+      row_id: row.id,
+      column_name: String(field),
+      message: `AIP field ${String(field)} was updated.`,
+    });
     await writeDb(db);
     return { row: toAipRow(row), historyEntry };
   }
@@ -562,11 +791,17 @@ export async function updateAipRowField(
     edited_by_admin: DEFAULT_ADMIN_ID,
     edited_by_user: actor.id,
     edited_by_role: actor.role,
-    change_status: "approved",
+    change_status: "pending",
     action_type: "edit",
   });
 
   db.aip_rows = rows;
+  notifyRelevantUsers(db, actor, {
+    entity_name: "aip_rows",
+    row_id: row.id,
+    column_name: String(field),
+    message: `AIP field ${String(field)} was updated by lead.`,
+  });
   await writeDb(db);
   return { row: toAipRow(row), historyEntry };
 }
@@ -600,6 +835,14 @@ export async function deleteAipRows(
   );
 
   db.aip_rows = (db.aip_rows ?? []).filter((row) => !selected.has(row.id));
+  for (const row of toDelete) {
+    notifyRelevantUsers(db, actor, {
+      entity_name: "aip_rows",
+      row_id: row.id,
+      column_name: "__row__",
+      message: "AIP row deleted.",
+    });
+  }
   await writeDb(db);
   return historyEntries;
 }
@@ -651,6 +894,12 @@ export async function createMonitoringRow(actor: ActorContext): Promise<{
     row_snapshot: snapshotRow(row),
   });
   db.monitoring_rows = rows;
+  notifyRelevantUsers(db, actor, {
+    entity_name: "monitoring_rows",
+    row_id: row.id,
+    column_name: "__row__",
+    message: "Monitoring row created.",
+  });
   await writeDb(db);
   return { row: toMonitoringRow(row), historyEntry };
 }
@@ -701,6 +950,12 @@ export async function updateMonitoringRowField(
   });
 
   db.monitoring_rows = rows;
+  notifyRelevantUsers(db, actor, {
+    entity_name: "monitoring_rows",
+    row_id: row.id,
+    column_name: String(field),
+    message: `Monitoring field ${String(field)} was updated.`,
+  });
   await writeDb(db);
   return { row: toMonitoringRow(row), historyEntry };
 }
@@ -738,6 +993,14 @@ export async function deleteMonitoringRows(
   db.monitoring_rows = (db.monitoring_rows ?? []).filter(
     (row) => !selected.has(row.id),
   );
+  for (const row of toDelete) {
+    notifyRelevantUsers(db, actor, {
+      entity_name: "monitoring_rows",
+      row_id: row.id,
+      column_name: "__row__",
+      message: "Monitoring row deleted.",
+    });
+  }
   await writeDb(db);
   return historyEntries;
 }
@@ -807,6 +1070,12 @@ export async function uploadLeadAipRows(
 
   db.lead_files = leadFiles;
   db.aip_rows = [...aipRows, ...createdRows];
+  notifyRelevantUsers(db, actor, {
+    entity_name: "aip_rows",
+    row_id: createdRows[0]?.id ?? 0,
+    column_name: "__row__",
+    message: `Lead submitted ${cleanedRows.length} AIP row(s).`,
+  });
   await writeDb(db);
 
   return {
@@ -994,4 +1263,114 @@ export async function restoreHistoryEntry(historyId: number): Promise<{
   db.monitoring_rows = rows.sort((a, b) => a.id - b.id);
   await writeDb(db);
   return { row: toMonitoringRow(row) };
+}
+
+export async function getCommentsForEntity(
+  actor: ActorContext,
+  entity: "aip_rows" | "monitoring_rows",
+): Promise<CommentEntry[]> {
+  const db = await readDb();
+  const comments = getComments(db)
+    .map(toCommentEntry)
+    .filter((comment) => comment.entity_name === entity);
+
+  if (entity === "aip_rows" && actor.role === "lead") {
+    const visibleIds = new Set(
+      getAipRows(db)
+        .filter((row) => row.lead_id === actor.id)
+        .map((row) => row.id),
+    );
+    return comments
+      .filter((comment) => visibleIds.has(comment.row_id))
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }
+
+  return comments.sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+export async function addCommentToEntity(
+  actor: ActorContext,
+  payload: {
+    entity_name: "aip_rows" | "monitoring_rows";
+    row_id: number;
+    column_name: string;
+    comment_text: string;
+  },
+): Promise<CommentEntry> {
+  const text = payload.comment_text.trim();
+  if (!text) {
+    throw new Error("Comment cannot be empty.");
+  }
+
+  const db = await readDb();
+  if (actor.role !== "admin") {
+    throw new Error("Only admins can create comments.");
+  }
+
+  const comments = getComments(db);
+  const actorIdentity = getActorIdentity(db, actor);
+  const created: RawCommentEntry = {
+    id: nextId(comments),
+    project_id: DEFAULT_PROJECT_ID,
+    entity_name: payload.entity_name,
+    row_id: payload.row_id,
+    column_name: payload.column_name || "__row__",
+    comment_text: text,
+    created_by_id: actor.id,
+    created_by_role: actor.role,
+    created_by_name: actorIdentity.name,
+    created_by_avatar: actorIdentity.avatar,
+    created_at: new Date().toISOString(),
+  };
+
+  comments.push(created);
+  db.comments = comments;
+
+  notifyOtherAdmins(db, actor, {
+    entity_name: payload.entity_name,
+    row_id: payload.row_id,
+    column_name: payload.column_name || "__row__",
+    message: `New comment added on ${payload.column_name || "entry"}.`,
+  });
+
+  await writeDb(db);
+  return toCommentEntry(created);
+}
+
+export async function getActorNotifications(
+  actor: ActorContext,
+): Promise<NotificationEntry[]> {
+  const db = await readDb();
+  return getNotifications(db)
+    .map(toNotificationEntry)
+    .filter(
+      (entry) =>
+        entry.recipient_id === actor.id && entry.recipient_role === actor.role,
+    )
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+export async function markNotificationAsRead(
+  actor: ActorContext,
+  notificationId: number,
+): Promise<NotificationEntry> {
+  const db = await readDb();
+  const notifications = getNotifications(db);
+  const idx = notifications.findIndex((entry) => entry.id === notificationId);
+  if (idx < 0) {
+    throw new Error("Notification not found.");
+  }
+
+  const target = notifications[idx];
+  if (target.recipient_id !== actor.id || target.recipient_role !== actor.role) {
+    throw new Error("Not allowed to update this notification.");
+  }
+
+  notifications[idx] = {
+    ...target,
+    read_at: target.read_at ?? new Date().toISOString(),
+  };
+  db.notifications = notifications;
+  await writeDb(db);
+  return toNotificationEntry(notifications[idx]);
 }

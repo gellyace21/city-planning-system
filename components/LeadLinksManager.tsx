@@ -131,7 +131,8 @@ export default function LeadLinksManager(): React.JSX.Element | null {
           flex-direction: column;
           align-items: center;
           gap: 8px;
-          width: min(860px, 100%);
+          // width: min(860px, 100%);
+          width: auto;
         }
 
         .lead-row {

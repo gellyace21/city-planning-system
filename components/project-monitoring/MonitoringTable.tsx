@@ -30,6 +30,12 @@ interface MonitoringTableProps {
   handleSort: (col: MonitoringSortKey) => void;
   sortCol: MonitoringSortKey;
   sortDir: SortDir;
+  commentCountsByCell: Record<string, number>;
+  commentCountsByRow: Record<string, number>;
+  onOpenComments: (
+    rowId: number,
+    field: keyof MonitoringRow | "__row__",
+  ) => void;
 }
 
 const MONITORING_NUMERIC_FIELDS = new Set<keyof MonitoringRow>([
@@ -54,6 +60,9 @@ export default function MonitoringTable({
   handleSort,
   sortCol,
   sortDir,
+  commentCountsByCell,
+  commentCountsByRow,
+  onOpenComments,
 }: MonitoringTableProps): React.JSX.Element {
   const SortIcon: FC<{ col: MonitoringSortKey }> = ({ col }) =>
     sortCol === col ? (
@@ -73,10 +82,12 @@ export default function MonitoringTable({
     const isActive = editCell?.rowId === row.id && editCell?.field === field;
     const value = row[field];
     const isNumeric = MONITORING_NUMERIC_FIELDS.has(field);
+    const commentCount = commentCountsByCell[`${row.id}:${String(field)}`] ?? 0;
+    const commentClass = commentCount > 0 ? "ring-1 ring-amber-300/70" : "";
 
     if (isActive) {
       return (
-        <td className={className}>
+        <td className={`${className} ${commentClass}`}>
           {textarea ? (
             <textarea
               autoFocus
@@ -105,12 +116,17 @@ export default function MonitoringTable({
 
     return (
       <td
-        className={`${className} cursor-pointer group relative`}
+        className={`${className} ${commentClass} cursor-pointer group relative`}
         onDoubleClick={() => startEdit(row.id, field, value)}
         title="Double-click to edit"
       >
         <span className="group-hover:bg-emerald-50 rounded px-0.5 transition-colors">
           {display || <span className="text-gray-300 italic">—</span>}
+          {commentCount > 0 && (
+            <span className="ml-1 inline-flex min-w-4 h-4 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold items-center justify-center">
+              {commentCount}
+            </span>
+          )}
         </span>
       </td>
     );
@@ -294,8 +310,14 @@ export default function MonitoringTable({
                       type="button"
                       className="h-full inline-flex w-6 items-center justify-center align-center rounded text-gray-400 transition-colors group-hover:text-emerald-600"
                       title="Comments"
+                      onClick={() => onOpenComments(row.id, "__row__")}
                     >
                       <IconMessageCircle />
+                      {(commentCountsByRow[String(row.id)] ?? 0) > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 inline-flex min-w-4 h-4 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold items-center justify-center">
+                          {commentCountsByRow[String(row.id)]}
+                        </span>
+                      )}
                     </button>
                   </td>
                 </tr>

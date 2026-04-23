@@ -8,7 +8,11 @@ import { redirect } from "next/navigation";
 const page = async () => {
   const session = await getServerSession(authOptions);
   const role = session?.user?.role;
-  if (role !== "admin" && role !== "superadmin") {
+  if (role === "superadmin") {
+    redirect("/dashboard/superadmin");
+  }
+
+  if (role !== "admin") {
     redirect("/dashboard");
   }
 
