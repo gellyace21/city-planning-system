@@ -5,11 +5,20 @@ import { useSession } from "next-auth/react";
 
 type GeneratedLink = {
   id: number;
+  lead_id: number;
   lead_username: string;
   token: string;
   created_at: string;
   last_accessed_at?: string;
   url: string;
+};
+
+type LeadUploadedFile = {
+  id: number;
+  lead_id: number;
+  file_name: string;
+  uploaded_at: string;
+  row_count: number;
 };
 
 export default function LeadLinksManager(): React.JSX.Element | null {
@@ -22,6 +31,8 @@ export default function LeadLinksManager(): React.JSX.Element | null {
   const [leadUsername, setLeadUsername] = useState("");
   const [leadDepartment, setLeadDepartment] = useState("General");
   const [generatedLinks, setGeneratedLinks] = useState<GeneratedLink[]>([]);
+  const [leadUploads, setLeadUploads] = useState<Record<number, LeadUploadedFile[]>>({});
+  const [expandedLeadId, setExpandedLeadId] = useState<number | null>(null);
   const [linkLoading, setLinkLoading] = useState(false);
   const [linkMessage, setLinkMessage] = useState("");
   const [linkError, setLinkError] = useState("");
@@ -43,6 +54,17 @@ export default function LeadLinksManager(): React.JSX.Element | null {
         );
       }
       setGeneratedLinks(data.links || []);
+      const grouped = ((data.leadFiles || []) as LeadUploadedFile[]).reduce(
+        (acc, file) => {
+          if (!acc[file.lead_id]) {
+            acc[file.lead_id] = [];
+          }
+          acc[file.lead_id].push(file);
+          return acc;
+        },
+        {} as Record<number, LeadUploadedFile[]>,
+      );
+      setLeadUploads(grouped);
     } catch (error) {
       setLinkError(
         error instanceof Error ? error.message : "Failed to load lead links",
@@ -306,6 +328,50 @@ export default function LeadLinksManager(): React.JSX.Element | null {
           color: #426457;
         }
 
+        .generated-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .view-btn {
+          border: 1px solid #c9e5d8;
+          border-radius: 6px;
+          background: #f3fbf7;
+          color: #2f6f59;
+          font-size: 11px;
+          font-weight: 700;
+          padding: 6px 10px;
+          cursor: pointer;
+        }
+
+        .uploads-panel {
+          width: 100%;
+          border-top: 1px solid #e3f2eb;
+          padding-top: 8px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .uploads-empty {
+          font-size: 11px;
+          color: #6b8e7f;
+          font-style: italic;
+        }
+
+        .uploads-item {
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          font-size: 11px;
+          color: #315848;
+          border: 1px solid #e7f4ee;
+          border-radius: 6px;
+          padding: 6px 8px;
+          background: #fdfefe;
+        }
+
         @media (max-width: 640px) {
           .lead-row,
           .link-row {
@@ -414,13 +480,48 @@ export default function LeadLinksManager(): React.JSX.Element | null {
                   ? ` | Last used: ${new Date(entry.last_accessed_at).toLocaleString()}`
                   : " | Not used yet"}
               </div>
-              <button
-                type="button"
-                className="copy-btn"
-                onClick={() => handleCopyLink(entry.url)}
-              >
-                Copy Link
-              </button>
+              <div className="generated-actions">
+                <button
+                  type="button"
+                  className="view-btn"
+                  onClick={() =>
+                    setExpandedLeadId((prev) =>
+                      prev === entry.lead_id ? null : entry.lead_id,
+                    )
+                  }
+                >
+                  {expandedLeadId === entry.lead_id
+                    ? "Hide Uploaded Files"
+                    : "View Uploaded Files"}
+                </button>
+                <button
+                  type="button"
+                  className="copy-btn"
+                  onClick={() => handleCopyLink(entry.url)}
+                >
+                  Copy Link
+                </button>
+              </div>
+
+              {expandedLeadId === entry.lead_id ? (
+                <div className="uploads-panel">
+                  {(leadUploads[entry.lead_id] || []).length === 0 ? (
+                    <div className="uploads-empty">
+                      No files uploaded by this lead yet.
+                    </div>
+                  ) : (
+                    (leadUploads[entry.lead_id] || []).map((file) => (
+                      <div className="uploads-item" key={file.id}>
+                        <span>{file.file_name}</span>
+                        <span>
+                          {file.row_count} rows |{" "}
+                          {new Date(file.uploaded_at).toLocaleString()}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : null}
             </div>
           ))}
         </div>

@@ -1,6 +1,13 @@
 "use client";
 
-import React, { FC, KeyboardEvent } from "react";
+import React, {
+  FC,
+  KeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   MonitoringEditCell,
   MonitoringRow,
@@ -46,6 +53,18 @@ const MONITORING_NUMERIC_FIELDS = new Set<keyof MonitoringRow>([
   "status_percent",
 ]);
 
+const INITIAL_COLUMN_WIDTHS = [
+  44, 220, 160, 120, 120, 120, 120, 120, 130, 120, 180, 180, 110, 220, 180,
+  44,
+];
+
+const MIN_COLUMN_WIDTH = 72;
+
+const MIN_COLUMN_WIDTH_BY_INDEX: Record<number, number> = {
+  0: 40,
+  15: 40,
+};
+
 export default function MonitoringTable({
   filtered,
   selectedRows,
@@ -64,6 +83,63 @@ export default function MonitoringTable({
   commentCountsByRow,
   onOpenComments,
 }: MonitoringTableProps): React.JSX.Element {
+  const [columnWidths, setColumnWidths] = useState<number[]>(
+    INITIAL_COLUMN_WIDTHS,
+  );
+  const resizeStateRef = useRef<{
+    colIndex: number;
+    startX: number;
+    startWidth: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const onMouseMove = (event: MouseEvent): void => {
+      const state = resizeStateRef.current;
+      if (!state) return;
+
+      const minWidth =
+        MIN_COLUMN_WIDTH_BY_INDEX[state.colIndex] ?? MIN_COLUMN_WIDTH;
+      const nextWidth = Math.max(
+        minWidth,
+        state.startWidth + (event.clientX - state.startX),
+      );
+
+      setColumnWidths((prev) => {
+        const next = [...prev];
+        next[state.colIndex] = nextWidth;
+        return next;
+      });
+    };
+
+    const onMouseUp = (): void => {
+      resizeStateRef.current = null;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
+
+  const startResize = (
+    colIndex: number,
+    event: ReactMouseEvent<HTMLDivElement>,
+  ): void => {
+    event.preventDefault();
+    event.stopPropagation();
+    resizeStateRef.current = {
+      colIndex,
+      startX: event.clientX,
+      startWidth: columnWidths[colIndex] ?? INITIAL_COLUMN_WIDTHS[colIndex],
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
+
   const SortIcon: FC<{ col: MonitoringSortKey }> = ({ col }) =>
     sortCol === col ? (
       <span className="ml-1 text-emerald-600">
@@ -80,14 +156,16 @@ export default function MonitoringTable({
     textarea?: boolean;
   }> = ({ row, field, className = "", textarea = false }) => {
     const isActive = editCell?.rowId === row.id && editCell?.field === field;
-    const value = row[field];
     const isNumeric = MONITORING_NUMERIC_FIELDS.has(field);
+    const value =
+      (row[field] as string | number | undefined) ?? (isNumeric ? 0 : "");
     const commentCount = commentCountsByCell[`${row.id}:${String(field)}`] ?? 0;
-    const commentClass = commentCount > 0 ? "ring-1 ring-amber-300/70" : "";
+    const commentClass =
+      commentCount > 0 ? "bg-amber-50/80 ring-1 ring-amber-300/70" : "";
 
     if (isActive) {
       return (
-        <td className={`${className} ${commentClass}`}>
+        <td className={`${className} ${commentClass} relative`}>
           {textarea ? (
             <textarea
               autoFocus
@@ -108,6 +186,20 @@ export default function MonitoringTable({
               className="w-full min-w-0 text-[11px] border border-emerald-400 rounded px-1 py-0.5 bg-emerald-50 focus:outline-none"
             />
           )}
+          {commentCount > 0 && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenComments(row.id, field);
+              }}
+              className="absolute right-1 top-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700"
+              title={`Open ${commentCount} comment${commentCount > 1 ? "s" : ""}`}
+            >
+              <IconMessageCircle size={11} />
+              {commentCount}
+            </button>
+          )}
         </td>
       );
     }
@@ -122,12 +214,21 @@ export default function MonitoringTable({
       >
         <span className="group-hover:bg-emerald-50 rounded px-0.5 transition-colors">
           {display || <span className="text-gray-300 italic">—</span>}
-          {commentCount > 0 && (
-            <span className="ml-1 inline-flex min-w-4 h-4 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold items-center justify-center">
-              {commentCount}
-            </span>
-          )}
         </span>
+        {commentCount > 0 && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenComments(row.id, field);
+            }}
+            className="absolute right-1 top-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 opacity-95 transition-opacity group-hover:opacity-100"
+            title={`Open ${commentCount} comment${commentCount > 1 ? "s" : ""}`}
+          >
+            <IconMessageCircle size={11} />
+            {commentCount}
+          </button>
+        )}
       </td>
     );
   };
@@ -139,29 +240,16 @@ export default function MonitoringTable({
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="overflow-x-hidden">
-        <table className="w-full table-fixed text-[14px] border-collapse [&_th]:align-top [&_td]:align-top [&_td]:wrap-break-word [&_td]:whitespace-normal">
+      <div className="overflow-x-auto">
+        <table className="min-w-full w-max table-fixed text-[14px] border-collapse [&_th]:align-top [&_td]:align-top [&_td]:wrap-break-word [&_td]:whitespace-normal">
           <colgroup>
-            <col style={{ width: "2%" }} />
-            <col style={{ width: "12%" }} />
-            <col style={{ width: "8%" }} />
-            <col style={{ width: "5%" }} />
-            <col style={{ width: "5%" }} />
-            <col style={{ width: "5%" }} />
-            <col style={{ width: "5%" }} />
-            <col style={{ width: "5%" }} />
-            <col style={{ width: "8%" }} />
-            <col style={{ width: "5%" }} />
-            <col style={{ width: "8%" }} />
-            <col style={{ width: "8%" }} />
-            <col style={{ width: "4%" }} />
-            <col style={{ width: "10%" }} />
-            <col style={{ width: "6%" }} />
-            <col style={{ width: "2%" }} />
+            {columnWidths.map((width, index) => (
+              <col key={`monitoring-col-${index}`} style={{ width: `${width}px` }} />
+            ))}
           </colgroup>
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200 text-gray-600">
-              <th className="w-8 px-1 py-2 text-[14px]">
+              <th className="w-8 px-1 py-2 text-[14px] relative">
                 <input
                   type="checkbox"
                   className="rounded"
@@ -169,6 +257,10 @@ export default function MonitoringTable({
                     selectedRows.size === filtered.length && filtered.length > 0
                   }
                   onChange={toggleAll}
+                />
+                <div
+                  className="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none"
+                  onMouseDown={(event) => startResize(0, event)}
                 />
               </th>
               {[
@@ -186,17 +278,29 @@ export default function MonitoringTable({
                 ["status_percent", "Status %"],
                 ["action_recommendation", "Action Recommendation"],
                 ["remarks", "Remarks"],
-              ].map(([col, label]) => (
+              ].map(([col, label], index) => (
                 <th
                   key={col}
-                  className="px-1.5 py-2 text-left text-[10px] font-bold uppercase tracking-tight whitespace-normal wrap-break-word cursor-pointer hover:bg-emerald-50"
+                  className="px-1.5 py-2 text-left text-[10px] font-bold uppercase tracking-tight whitespace-normal wrap-break-word cursor-pointer hover:bg-emerald-50 relative select-none"
                   onClick={() => handleSort(col as MonitoringSortKey)}
                 >
-                  {label}
-                  <SortIcon col={col as MonitoringSortKey} />
+                  <span>
+                    {label}
+                    <SortIcon col={col as MonitoringSortKey} />
+                  </span>
+                  <div
+                    className="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none"
+                    onMouseDown={(event) => startResize(index + 1, event)}
+                    onClick={(event) => event.stopPropagation()}
+                  />
                 </th>
               ))}
-              <th className="bg-transparent border-0 px-0 py-2" />
+              <th className="bg-transparent border-0 px-0 py-2 relative">
+                <div
+                  className="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none"
+                  onMouseDown={(event) => startResize(15, event)}
+                />
+              </th>
             </tr>
           </thead>
 

@@ -15,6 +15,14 @@ type LeadLink = {
   last_accessed_at?: string;
 };
 
+type LeadFile = {
+  id: number;
+  lead_id: number;
+  file_name: string;
+  uploaded_at: string;
+  row_count: number;
+};
+
 const DB_PATH = path.join(process.cwd(), "db.json");
 
 async function readDb() {
@@ -46,6 +54,7 @@ export async function GET(request: NextRequest) {
 
     const db = await readDb();
     const links: LeadLink[] = db.generated_links || [];
+    const leadFiles: LeadFile[] = (db.lead_files || []) as LeadFile[];
     const origin = request.nextUrl.origin;
 
     const result = links
@@ -55,7 +64,13 @@ export async function GET(request: NextRequest) {
         url: `${origin}/lead-access/${link.token}`,
       }));
 
-    return NextResponse.json({ links: result });
+    const files = leadFiles
+      .slice()
+      .sort((a, b) =>
+        String(b.uploaded_at).localeCompare(String(a.uploaded_at)),
+      );
+
+    return NextResponse.json({ links: result, leadFiles: files });
   } catch (error) {
     console.error("Failed to get lead links:", error);
     return NextResponse.json(

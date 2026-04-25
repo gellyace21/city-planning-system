@@ -1,10 +1,37 @@
 "use client";
 
-import React, { FC, KeyboardEvent } from "react";
+import React, {
+  FC,
+  KeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { AIPRow, EditCell, SortDir, SortKey } from "./types";
 import { fmt } from "./utils";
 import SectorBadge from "./SectorBadge";
 import { IconMessageCircle } from "@tabler/icons-react";
+
+const INITIAL_COLUMN_WIDTHS = [
+  44, 110, 320, 130, 160, 150, 220, 130, 90, 90, 90, 90, 100, 120, 120, 90,
+  44,
+];
+
+const MIN_COLUMN_WIDTH = 72;
+
+const MIN_COLUMN_WIDTH_BY_INDEX: Record<number, number> = {
+  0: 40,
+  8: 70,
+  9: 70,
+  10: 70,
+  11: 70,
+  12: 80,
+  13: 90,
+  14: 90,
+  15: 70,
+  16: 40,
+};
 
 interface AIPTableProps {
   filtered: AIPRow[];
@@ -27,6 +54,12 @@ interface AIPTableProps {
   handleSort: (col: SortKey) => void;
   sortCol: SortKey;
   sortDir: SortDir;
+  sectorFilter: string;
+  departmentFilter: string;
+  sectorOptions: string[];
+  departmentOptions: string[];
+  onSectorFilterChange: (value: string) => void;
+  onDepartmentFilterChange: (value: string) => void;
   cellStatuses: Record<string, "pending" | "approved" | "rejected">;
   commentCountsByCell: Record<string, number>;
   commentCountsByRow: Record<string, number>;
@@ -49,12 +82,152 @@ export default function AIPTable({
   handleSort,
   sortCol,
   sortDir,
+  sectorFilter,
+  departmentFilter,
+  sectorOptions,
+  departmentOptions,
+  onSectorFilterChange,
+  onDepartmentFilterChange,
   cellStatuses,
   commentCountsByCell,
   commentCountsByRow,
   onOpenComments,
   focusedRowId,
 }: AIPTableProps): React.JSX.Element {
+  const [columnWidths, setColumnWidths] = useState<number[]>(
+    INITIAL_COLUMN_WIDTHS,
+  );
+  const [openFilter, setOpenFilter] = useState<"sector" | "department" | null>(
+    null,
+  );
+  const resizeStateRef = useRef<{
+    colIndex: number;
+    startX: number;
+    startWidth: number;
+  } | null>(null);
+  const tableWrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const onMouseMove = (event: MouseEvent): void => {
+      const state = resizeStateRef.current;
+      if (!state) return;
+
+      const minWidth =
+        MIN_COLUMN_WIDTH_BY_INDEX[state.colIndex] ?? MIN_COLUMN_WIDTH;
+      const nextWidth = Math.max(
+        minWidth,
+        state.startWidth + (event.clientX - state.startX),
+      );
+
+      setColumnWidths((prev) => {
+        const next = [...prev];
+        next[state.colIndex] = nextWidth;
+        return next;
+      });
+    };
+
+    const onMouseUp = (): void => {
+      resizeStateRef.current = null;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onPointerDown = (event: MouseEvent): void => {
+      const target = event.target as Node;
+      if (!tableWrapRef.current?.contains(target)) {
+        setOpenFilter(null);
+      }
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+    };
+  }, []);
+
+  const startResize = (
+    colIndex: number,
+    event: ReactMouseEvent<HTMLDivElement>,
+  ): void => {
+    event.preventDefault();
+    event.stopPropagation();
+    resizeStateRef.current = {
+      colIndex,
+      startX: event.clientX,
+      startWidth: columnWidths[colIndex] ?? INITIAL_COLUMN_WIDTHS[colIndex],
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
+
+  const HeaderResizeHandle: FC<{ colIndex: number }> = ({ colIndex }) => (
+    <div
+      className="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none"
+      onMouseDown={(event) => startResize(colIndex, event)}
+      onClick={(event) => event.stopPropagation()}
+    />
+  );
+
+  const FilterHeader: FC<{
+    label: string;
+    filterKey: "sector" | "department";
+    options: string[];
+    value: string;
+    onChange: (value: string) => void;
+    colIndex: number;
+  }> = ({ label, filterKey, options, value, onChange, colIndex }) => {
+    const isOpen = openFilter === filterKey;
+    return (
+      <th
+        className="px-1.5 py-2 text-left text-[10px] font-bold uppercase tracking-tight select-none whitespace-normal wrap-break-word transition-colors relative"
+      >
+        <button
+          type="button"
+          className="flex items-center gap-1 cursor-pointer hover:bg-sky-50 rounded px-0.5"
+          onClick={(event) => {
+            event.stopPropagation();
+            setOpenFilter((current) => (current === filterKey ? null : filterKey));
+          }}
+        >
+          <span>{label}</span>
+          <span className="text-gray-300">↕</span>
+        </button>
+
+        {isOpen && (
+          <div className="absolute left-0 top-full z-20 mt-1 w-52 rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden normal-case text-sm">
+            {options.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={`w-full text-left px-3 py-2 hover:bg-sky-50 ${option === value ? "bg-sky-50 font-semibold text-sky-700" : "text-gray-700"}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onChange(option);
+                  setOpenFilter(null);
+                }}
+              >
+                {filterKey === "department" && option === "All"
+                  ? "All Departments"
+                  : option}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <HeaderResizeHandle colIndex={colIndex} />
+      </th>
+    );
+  };
+
   // ── Sub-components ──
   interface EditableCellProps {
     row: AIPRow;
@@ -83,19 +256,34 @@ export default function AIPTable({
           : status === "rejected"
             ? "bg-rose-50/80"
             : "";
-    const commentClass = commentCount > 0 ? "ring-1 ring-amber-300/70" : "";
+    const commentClass =
+      commentCount > 0 ? "bg-amber-50/80 ring-1 ring-amber-300/70" : "";
 
     if (readOnly) {
       return (
-        <td className={`${className} ${statusClass} ${commentClass}`}>
+        <td className={`${className} ${statusClass} ${commentClass} relative`}>
           <span className="font-bold text-sky-700">{fmt(value as number)}</span>
+          {commentCount > 0 && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenComments(row.id, field);
+              }}
+              className="absolute right-1 top-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700"
+              title={`Open ${commentCount} comment${commentCount > 1 ? "s" : ""}`}
+            >
+              <IconMessageCircle size={11} />
+              {commentCount}
+            </button>
+          )}
         </td>
       );
     }
 
     if (isActive) {
       return (
-        <td className={`${className} ${statusClass} ${commentClass}`}>
+        <td className={`${className} ${statusClass} ${commentClass} relative`}>
           <input
             autoFocus
             type={numeric ? "number" : "text"}
@@ -105,13 +293,27 @@ export default function AIPTable({
             onKeyDown={handleKeyDown}
             className="w-full min-w-0 text-[11px] border border-sky-400 rounded px-1 py-0.5 bg-sky-50 focus:outline-none focus:ring-1 focus:ring-sky-500"
           />
+          {commentCount > 0 && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenComments(row.id, field);
+              }}
+              className="absolute right-1 top-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700"
+              title={`Open ${commentCount} comment${commentCount > 1 ? "s" : ""}`}
+            >
+              <IconMessageCircle size={11} />
+              {commentCount}
+            </button>
+          )}
         </td>
       );
     }
 
     return (
       <td
-        className={`${className} ${statusClass} ${commentClass} cursor-pointer group`}
+        className={`${className} ${statusClass} ${commentClass} cursor-pointer group relative`}
         onDoubleClick={() => startEdit(row.id, field, value)}
         title="Double-click to edit"
       >
@@ -132,12 +334,21 @@ export default function AIPTable({
               }`}
             />
           )}
-          {commentCount > 0 && (
-            <span className="ml-1 inline-flex min-w-4 h-4 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold items-center justify-center">
-              {commentCount}
-            </span>
-          )}
         </span>
+        {commentCount > 0 && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenComments(row.id, field);
+            }}
+            className="absolute right-1 top-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 opacity-95 transition-opacity group-hover:opacity-100"
+            title={`Open ${commentCount} comment${commentCount > 1 ? "s" : ""}`}
+          >
+            <IconMessageCircle size={11} />
+            {commentCount}
+          </button>
+        )}
       </td>
     );
   };
@@ -152,10 +363,12 @@ export default function AIPTable({
   const renderTh = ({
     col,
     label,
+    colIndex,
     cls = "",
   }: {
     col: SortKey;
     label: string;
+    colIndex: number;
     cls?: string;
   }): React.JSX.Element => (
     <th
@@ -164,6 +377,7 @@ export default function AIPTable({
     >
       {label}
       {col && renderSortIcon(col)}
+      <HeaderResizeHandle colIndex={colIndex} />
     </th>
   );
 
@@ -183,31 +397,17 @@ export default function AIPTable({
   const totalBudget = filtered.reduce((s, r) => s + r.total, 0);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="overflow-x-hidden">
-        <table className="w-full table-fixed text-[11px] border-collapse [&_th]:align-top [&_td]:align-top [&_td]:wrap-break-word [&_td]:whitespace-normal">
+    <div ref={tableWrapRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="min-w-full w-max table-fixed text-[11px] border-collapse [&_th]:align-top [&_td]:align-top [&_td]:wrap-break-word [&_td]:whitespace-normal">
           <colgroup>
-            <col style={{ width: "2%" }} />
-            <col style={{ width: "6%" }} />
-            <col style={{ width: "18%" }} />
-            <col style={{ width: "7%" }} />
-            <col style={{ width: "8%" }} />
-            <col style={{ width: "8%" }} />
-            <col style={{ width: "12%" }} />
-            <col style={{ width: "7%" }} />
-            <col style={{ width: "4%" }} />
-            <col style={{ width: "4%" }} />
-            <col style={{ width: "3%" }} />
-            <col style={{ width: "4%" }} />
-            <col style={{ width: "4%" }} />
-            <col style={{ width: "5%" }} />
-            <col style={{ width: "5%" }} />
-            <col style={{ width: "3%" }} />
-            <col style={{ width: "2%" }} />
+            {columnWidths.map((width, index) => (
+              <col key={`aip-col-${index}`} style={{ width: `${width}px` }} />
+            ))}
           </colgroup>
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200 text-gray-600">
-              <th className="w-8 px-1 py-2">
+              <th className="w-8 px-1 py-2 relative">
                 <input
                   type="checkbox"
                   className="rounded"
@@ -216,60 +416,99 @@ export default function AIPTable({
                   }
                   onChange={toggleAll}
                 />
+                <HeaderResizeHandle colIndex={0} />
               </th>
-              {renderTh({ col: "aipCode", label: "AIP Code" })}
+              {renderTh({
+                col: "aipCode",
+                label: "AIP Code",
+                colIndex: 1,
+                cls: "relative",
+              })}
               {renderTh({
                 col: "description",
                 label: "Program / Project / Activity",
+                colIndex: 2,
+                cls: "relative",
               })}
-              {renderTh({ col: "sector", label: "Sector" })}
+              <FilterHeader
+                label="Sector"
+                filterKey="sector"
+                options={sectorOptions}
+                value={sectorFilter}
+                onChange={onSectorFilterChange}
+                colIndex={3}
+              />
+              <FilterHeader
+                label="Department"
+                filterKey="department"
+                options={departmentOptions}
+                value={departmentFilter}
+                onChange={onDepartmentFilterChange}
+                colIndex={4}
+              />
               {renderTh({
-                col: "department",
-                label: "Department",
+                col: null,
+                label: "Schedule",
+                colIndex: 5,
+                cls: "relative",
               })}
-              {renderTh({ col: null, label: "Schedule" })}
               {renderTh({
                 col: "outputs",
                 label: "Expected Outputs",
+                colIndex: 6,
+                cls: "relative",
               })}
-              {renderTh({ col: "funding", label: "Funding" })}
+              {renderTh({
+                col: "funding",
+                label: "Funding",
+                colIndex: 7,
+                cls: "relative",
+              })}
               <th
-                className="px-1 py-2 text-center text-[10px] font-bold uppercase tracking-tight bg-sky-50 text-sky-700 border-l border-sky-100"
+                className="px-1 py-2 text-center text-[10px] font-bold uppercase tracking-tight bg-sky-50 text-sky-700 border-l border-sky-100 relative"
                 colSpan={5}
               >
                 Amount (₱ Thousands)
+                <HeaderResizeHandle colIndex={12} />
               </th>
               <th
-                className="px-1 py-2 text-center text-[10px] font-bold uppercase tracking-tight bg-emerald-50 text-emerald-700 border-l border-emerald-100"
+                className="px-1 py-2 text-center text-[10px] font-bold uppercase tracking-tight bg-emerald-50 text-emerald-700 border-l border-emerald-100 relative"
                 colSpan={3}
               >
                 Climate Change Expenditure
+                <HeaderResizeHandle colIndex={15} />
               </th>
-              <th className="bg-transparent border-0 px-0 py-2" />
+              <th className="bg-transparent border-0 px-0 py-2 relative">
+                <HeaderResizeHandle colIndex={16} />
+              </th>
             </tr>
             <tr className="bg-gray-50 border-b-2 border-gray-300 text-gray-500 text-xs">
               <th colSpan={8} />
-              {amountCols.map(([col, label]) => (
+              {amountCols.map(([col, label], idx) => (
                 <th
                   key={col as string}
-                  className={`px-1 py-2 text-right text-[10px] font-semibold cursor-pointer hover:bg-sky-100 transition border-l border-sky-100 ${col === "total" ? "text-sky-700 font-bold" : ""}`}
+                  className={`px-1 py-2 text-right text-[10px] font-semibold cursor-pointer hover:bg-sky-100 transition border-l border-sky-100 relative ${col === "total" ? "text-sky-700 font-bold" : ""}`}
                   onClick={() => handleSort(col)}
                 >
                   {label}
                   {renderSortIcon(col)}
+                  <HeaderResizeHandle colIndex={8 + idx} />
                 </th>
               ))}
-              {ccCols.map(([col, label]) => (
+              {ccCols.map(([col, label], idx) => (
                 <th
                   key={col as string}
-                  className="px-1 py-2 text-right text-[10px] font-semibold cursor-pointer hover:bg-emerald-100 transition border-l border-emerald-100"
+                  className="px-1 py-2 text-right text-[10px] font-semibold cursor-pointer hover:bg-emerald-100 transition border-l border-emerald-100 relative"
                   onClick={() => handleSort(col)}
                 >
                   {label}
                   {renderSortIcon(col)}
+                  <HeaderResizeHandle colIndex={13 + idx} />
                 </th>
               ))}
-              <th />
+              <th className="relative">
+                <HeaderResizeHandle colIndex={16} />
+              </th>
             </tr>
           </thead>
 
@@ -290,6 +529,26 @@ export default function AIPTable({
                   ? "bg-white hover:bg-sky-50/20"
                   : "bg-gray-50/50 hover:bg-sky-50/20";
               const isFocused = focusedRowId === row.id;
+              const sectorCommentCount =
+                commentCountsByCell[`${row.id}:sector`] ?? 0;
+              const startDateCommentCount =
+                commentCountsByCell[`${row.id}:startDate`] ?? 0;
+              const endDateCommentCount =
+                commentCountsByCell[`${row.id}:endDate`] ?? 0;
+              const fundingCommentCount =
+                commentCountsByCell[`${row.id}:funding`] ?? 0;
+              const sectorCommentClass =
+                sectorCommentCount > 0
+                  ? "bg-amber-50/80 ring-1 ring-amber-300/70"
+                  : "";
+              const scheduleCommentClass =
+                startDateCommentCount + endDateCommentCount > 0
+                  ? "bg-amber-50/80 ring-1 ring-amber-300/70"
+                  : "";
+              const fundingCommentClass =
+                fundingCommentCount > 0
+                  ? "bg-amber-50/80 ring-1 ring-amber-300/70"
+                  : "";
               return (
                 <tr
                   key={row.id}
@@ -316,9 +575,9 @@ export default function AIPTable({
                     className="px-1.5 py-1.5 font-medium text-gray-800 leading-snug"
                   />
 
-                  {/* Sector — dropdown */}
+                  {/* Sector — free text edit */}
                   <td
-                    className="px-1.5 py-1.5 cursor-pointer"
+                    className={`px-1.5 py-1.5 cursor-pointer relative ${sectorCommentClass}`}
                     onDoubleClick={() =>
                       startEdit(row.id, "sector", row.sector)
                     }
@@ -326,23 +585,30 @@ export default function AIPTable({
                   >
                     {editCell?.rowId === row.id &&
                     editCell?.field === "sector" ? (
-                      <select
+                      <input
                         autoFocus
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
                         onBlur={commitEdit}
                         onKeyDown={handleKeyDown}
-                        className="text-xs border border-sky-400 rounded px-1 py-0.5 bg-white focus:outline-none"
-                      >
-                        <option value="">— select —</option>
-                        {allSectors.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
+                        className="w-full text-xs border border-sky-400 rounded px-1 py-0.5 bg-sky-50 focus:outline-none"
+                      />
                     ) : (
                       <SectorBadge sector={row.sector} />
+                    )}
+                    {sectorCommentCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpenComments(row.id, "sector");
+                        }}
+                        className="absolute right-1 top-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700"
+                        title={`Open ${sectorCommentCount} comment${sectorCommentCount > 1 ? "s" : ""}`}
+                      >
+                        <IconMessageCircle size={11} />
+                        {sectorCommentCount}
+                      </button>
                     )}
                   </td>
 
@@ -353,7 +619,9 @@ export default function AIPTable({
                   />
 
                   {/* Schedule */}
-                  <td className="px-1.5 py-1.5 text-[11px] text-gray-500">
+                  <td
+                    className={`px-1.5 py-1.5 text-[11px] text-gray-500 relative ${scheduleCommentClass}`}
+                  >
                     <div className="flex flex-col gap-0.5">
                       {editCell?.rowId === row.id &&
                       editCell?.field === "startDate" ? (
@@ -376,6 +644,20 @@ export default function AIPTable({
                         >
                           {row.startDate || (
                             <span className="text-gray-300 italic">start</span>
+                          )}
+                          {startDateCommentCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onOpenComments(row.id, "startDate");
+                              }}
+                              className="ml-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700"
+                              title={`Open ${startDateCommentCount} comment${startDateCommentCount > 1 ? "s" : ""}`}
+                            >
+                              <IconMessageCircle size={11} />
+                              {startDateCommentCount}
+                            </button>
                           )}
                         </span>
                       )}
@@ -402,6 +684,20 @@ export default function AIPTable({
                           {row.endDate || (
                             <span className="text-gray-300 italic">end</span>
                           )}
+                          {endDateCommentCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onOpenComments(row.id, "endDate");
+                              }}
+                              className="ml-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700"
+                              title={`Open ${endDateCommentCount} comment${endDateCommentCount > 1 ? "s" : ""}`}
+                            >
+                              <IconMessageCircle size={11} />
+                              {endDateCommentCount}
+                            </button>
+                          )}
                         </span>
                       )}
                     </div>
@@ -415,7 +711,7 @@ export default function AIPTable({
 
                   {/* Funding */}
                   <td
-                    className="px-1.5 py-1.5 text-[11px]"
+                    className={`px-1.5 py-1.5 text-[11px] relative ${fundingCommentClass}`}
                     onDoubleClick={() =>
                       startEdit(row.id, "funding", row.funding)
                     }
@@ -438,6 +734,20 @@ export default function AIPTable({
                           <span className="text-gray-300 italic">—</span>
                         )}
                       </span>
+                    )}
+                    {fundingCommentCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpenComments(row.id, "funding");
+                        }}
+                        className="absolute right-1 top-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700"
+                        title={`Open ${fundingCommentCount} comment${fundingCommentCount > 1 ? "s" : ""}`}
+                      >
+                        <IconMessageCircle size={11} />
+                        {fundingCommentCount}
+                      </button>
                     )}
                   </td>
 

@@ -1,6 +1,12 @@
 "use client";
 
-import React, { KeyboardEvent, useEffect, useMemo, useState } from "react";
+import React, {
+  KeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   addCommentAction,
   createAipRowAction,
@@ -9,9 +15,7 @@ import {
   deleteMonitoringRowsAction,
   fetchCommentsAction,
   fetchLeadUploadedFilesAction,
-  fetchNotificationsAction,
   fetchProjectMonitoringDataAction,
-  markNotificationReadAction,
   restoreHistoryEntryAction,
   uploadLeadAipFileAction,
   updateAipRowFieldAction,
@@ -27,14 +31,12 @@ import {
   MonitoringEditCell,
   MonitoringRow,
   MonitoringSortKey,
-  NotificationEntry,
   SortDir,
   SortKey,
 } from "./types";
 import {
   IconArrowBackUp,
   IconArrowForwardUp,
-  IconBell,
   IconHistory,
   IconPrinter,
   IconTrash,
@@ -43,6 +45,7 @@ import { downloadAIP, parseAIPExcel } from "@/lib/aipExport";
 import { useSession } from "next-auth/react";
 
 type ActiveDataset = "aip" | "monitoring";
+type HistoryPanelView = "all" | "lead";
 
 type ChangeOperation = {
   dataset: ActiveDataset;
@@ -106,9 +109,18 @@ export default function ProjectTable({
   const [busy, setBusy] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [showHistory, setShowHistory] = useState<boolean>(false);
+  const [historyPanelView, setHistoryPanelView] = useState<HistoryPanelView>(
+    "all",
+  );
   const [history, setHistory] = useState<EditHistoryEntry[]>(initialHistory);
   const [leadFiles, setLeadFiles] = useState<
-    { id: number; file_name: string; uploaded_at: string; row_count: number }[]
+    {
+      id: number;
+      lead_id: number;
+      file_name: string;
+      uploaded_at: string;
+      row_count: number;
+    }[]
   >([]);
   const [uploadingFile, setUploadingFile] = useState<boolean>(false);
 
@@ -120,15 +132,14 @@ export default function ProjectTable({
   const [commentDraft, setCommentDraft] = useState<string>("");
   const [commentSubmitting, setCommentSubmitting] = useState<boolean>(false);
 
-  const [notifications, setNotifications] = useState<NotificationEntry[]>([]);
-  const [showNotifications, setShowNotifications] = useState<boolean>(false);
-
   const [undoStack, setUndoStack] = useState<ChangeOperation[]>([]);
   const [redoStack, setRedoStack] = useState<ChangeOperation[]>([]);
+  const historyPanelRef = useRef<HTMLDivElement | null>(null);
 
   const [aipRows, setAipRows] = useState<AIPRow[]>(initialAipRows);
   const [aipSearch, setAipSearch] = useState<string>("");
   const [aipSector, setAipSector] = useState<string>("All");
+  const [aipDepartment, setAipDepartment] = useState<string>("All");
   const [aipYear, setAipYear] = useState<string>("All");
   const [aipSortCol, setAipSortCol] = useState<SortKey>(null);
   const [aipSortDir, setAipSortDir] = useState<SortDir>("asc");
@@ -211,6 +222,14 @@ export default function ProjectTable({
     [visibleAipRows],
   );
 
+  const allDepartments = useMemo(
+    () => [
+      "All",
+      ...new Set(visibleAipRows.map((row) => row.department).filter(Boolean)),
+    ],
+    [visibleAipRows],
+  );
+
   const aipYearOptions = useMemo(() => {
     return [
       "All",
@@ -239,6 +258,9 @@ export default function ProjectTable({
     return visibleAipRows
       .filter((row) => aipSector === "All" || row.sector === aipSector)
       .filter((row) =>
+        aipDepartment === "All" ? true : row.department === aipDepartment,
+      )
+      .filter((row) =>
         aipYear === "All" ? true : String(row.year ?? "") === aipYear,
       )
       .filter((row) => {
@@ -263,7 +285,15 @@ export default function ProjectTable({
             : String(av).localeCompare(String(bv));
         return aipSortDir === "asc" ? cmp : -cmp;
       });
-  }, [visibleAipRows, aipSector, aipYear, aipSearch, aipSortCol, aipSortDir]);
+  }, [
+    visibleAipRows,
+    aipSector,
+    aipDepartment,
+    aipYear,
+    aipSearch,
+    aipSortCol,
+    aipSortDir,
+  ]);
 
   const filteredMonitoring = useMemo(() => {
     return monitoringRows
@@ -350,10 +380,22 @@ export default function ProjectTable({
     );
   }, [history]);
 
-  const historyFeed = useMemo(() => {
-    if (mode === "aip" && isAdmin) return leadChangeLog;
+  const activeHistoryFeed = useMemo(() => {
+    if (mode === "aip" && historyPanelView === "lead") {
+      return leadChangeLog;
+    }
     return history;
-  }, [history, isAdmin, leadChangeLog, mode]);
+  }, [history, historyPanelView, leadChangeLog, mode]);
+
+  const activeHistoryTitle =
+    mode === "aip" && historyPanelView === "lead"
+      ? "Lead Edit History"
+      : "Edit History";
+
+  const openHistoryPanel = (view: HistoryPanelView): void => {
+    setHistoryPanelView(view);
+    setShowHistory(true);
+  };
 
   const commentCountsByCell = useMemo(() => {
     const mapped: Record<string, number> = {};
@@ -372,19 +414,6 @@ export default function ProjectTable({
     }
     return mapped;
   }, [comments]);
-
-  const mergedMonitoringActivityByCell = useMemo(() => {
-    const merged: Record<string, number> = { ...commentCountsByCell };
-    for (const [key, value] of Object.entries(monitoringChangeCountsByCell)) {
-      merged[key] = (merged[key] ?? 0) + value;
-    }
-    return merged;
-  }, [commentCountsByCell, monitoringChangeCountsByCell]);
-
-  const unreadCount = useMemo(
-    () => notifications.filter((item) => !item.read_at).length,
-    [notifications],
-  );
 
   const commentThread = useMemo(() => {
     if (!commentTarget) return [];
@@ -406,21 +435,28 @@ export default function ProjectTable({
     }
   };
 
-  const refreshNotifications = async (): Promise<void> => {
-    try {
-      const data = await fetchNotificationsAction();
-      setNotifications(data.slice(0, 80));
-    } catch {
-      setNotifications([]);
-    }
-  };
-
   useEffect(() => {
     if (!session?.user) return;
     void (async () => {
-      await Promise.all([refreshComments(), refreshNotifications()]);
+      await refreshComments();
     })();
   }, [session?.user?.id, session?.user?.role, entityName]);
+
+  useEffect(() => {
+    if (!showHistory) return;
+
+    const onPointerDown = (event: MouseEvent): void => {
+      const target = event.target as Node;
+      if (!historyPanelRef.current?.contains(target)) {
+        setShowHistory(false);
+      }
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+    };
+  }, [showHistory]);
 
   useEffect(() => {
     if (!session?.user) return;
@@ -530,7 +566,6 @@ export default function ProjectTable({
       setAipEditCell(null);
       setAipEditValue("");
       setErrorMsg("");
-      await refreshNotifications();
     } catch (error) {
       handleFailure(error);
     } finally {
@@ -550,7 +585,6 @@ export default function ProjectTable({
       setMonitoringEditCell(null);
       setMonitoringEditValue("");
       setErrorMsg("");
-      await refreshNotifications();
     } catch (error) {
       handleFailure(error);
     } finally {
@@ -697,7 +731,6 @@ export default function ProjectTable({
       setAipRows((prev) => [...prev, result.row]);
       pushHistory(result.historyEntry);
       setErrorMsg("");
-      await refreshNotifications();
     } catch (error) {
       handleFailure(error);
     } finally {
@@ -716,7 +749,6 @@ export default function ProjectTable({
       pushHistory(entries);
       setAipSelectedRows(new Set());
       setErrorMsg("");
-      await refreshNotifications();
     } catch (error) {
       handleFailure(error);
     } finally {
@@ -738,7 +770,6 @@ export default function ProjectTable({
       setAipRows((prev) => [...prev, ...result.uploadedRows]);
       const files = await fetchLeadUploadedFilesAction();
       setLeadFiles(files);
-      await refreshNotifications();
     } catch (error) {
       handleFailure(error);
     } finally {
@@ -750,6 +781,7 @@ export default function ProjectTable({
   const jumpToAipChange = (entry: EditHistoryEntry): void => {
     setAipSearch("");
     setAipSector("All");
+    setAipDepartment("All");
     setShowHistory(false);
     setFocusedAipRowId(entry.row_id);
 
@@ -826,7 +858,6 @@ export default function ProjectTable({
       setMonitoringRows((prev) => [...prev, result.row]);
       pushHistory(result.historyEntry);
       setErrorMsg("");
-      await refreshNotifications();
     } catch (error) {
       handleFailure(error);
     } finally {
@@ -847,7 +878,6 @@ export default function ProjectTable({
       pushHistory(entries);
       setMonitoringSelectedRows(new Set());
       setErrorMsg("");
-      await refreshNotifications();
     } catch (error) {
       handleFailure(error);
     } finally {
@@ -864,7 +894,6 @@ export default function ProjectTable({
       setMonitoringRows(refreshed.monitoringRows);
       setHistory(refreshed.history);
       setErrorMsg("");
-      await refreshNotifications();
     } catch (error) {
       handleFailure(error);
     } finally {
@@ -901,23 +930,10 @@ export default function ProjectTable({
       });
       setComments((prev) => [created, ...prev]);
       setCommentDraft("");
-      await refreshNotifications();
     } catch (error) {
       handleFailure(error);
     } finally {
       setCommentSubmitting(false);
-    }
-  };
-
-  const markNotificationRead = async (entry: NotificationEntry): Promise<void> => {
-    if (entry.read_at) return;
-    try {
-      const updated = await markNotificationReadAction(entry.id);
-      setNotifications((prev) =>
-        prev.map((item) => (item.id === updated.id ? updated : item)),
-      );
-    } catch {
-      // Ignore refresh errors for passive notification actions.
     }
   };
 
@@ -1023,59 +1039,45 @@ export default function ProjectTable({
             >
               <IconPrinter size={16} /> Print
             </button>
-            <div className="relative">
-              <button
-                onClick={() => setShowNotifications((prev) => !prev)}
-                className="px-3 py-1.5 rounded-lg text-sm font-semibold border bg-white text-gray-700 border-gray-200 flex items-center gap-1"
-              >
-                <IconBell size={16} /> Notifications
-                {unreadCount > 0 && (
-                  <span className="ml-1 inline-flex min-w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold items-center justify-center px-1">
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
-              {showNotifications && (
-                <div className="absolute right-0 top-10 z-20 w-96 max-h-96 overflow-auto bg-white border border-gray-200 rounded-xl shadow-lg">
-                  {notifications.length === 0 ? (
-                    <p className="px-4 py-3 text-sm text-gray-500">No notifications.</p>
-                  ) : (
-                    notifications.map((entry) => (
-                      <button
-                        type="button"
-                        key={entry.id}
-                        onClick={() => {
-                          void markNotificationRead(entry);
-                        }}
-                        className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 ${entry.read_at ? "opacity-70" : ""}`}
-                      >
-                        <p className="text-xs text-gray-500">
-                          {new Date(entry.created_at).toLocaleString()}
-                        </p>
-                        <p className="text-sm text-gray-800">{entry.message}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          by {entry.actor_name} ({entry.actor_role})
-                        </p>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
             {isAdmin && (
-              <button
-                onClick={() => setShowHistory((v) => !v)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-semibold border flex gap-2 justify-center items-center hover:bg-amber-100 hover:cursor-pointer duration-200 ease-in-out ${
-                  showHistory
-                    ? "bg-amber-600 text-white border-amber-600 hover:bg-amber-400"
-                    : "bg-white text-amber-700 border-amber-200"
-                }`}
-              >
-                <IconHistory size={16} />
-                {mode === "aip"
-                  ? `Lead Change Log (${historyFeed.length})`
-                  : `History (${historyFeed.length})`}
-              </button>
+              <>
+                <button
+                  onClick={() => {
+                    if (showHistory && historyPanelView === "all") {
+                      setShowHistory(false);
+                      return;
+                    }
+                    openHistoryPanel("all");
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold border flex gap-2 justify-center items-center hover:bg-amber-100 hover:cursor-pointer duration-200 ease-in-out ${
+                    showHistory && historyPanelView === "all"
+                      ? "bg-amber-600 text-white border-amber-600 hover:bg-amber-400"
+                      : "bg-white text-amber-700 border-amber-200"
+                  }`}
+                >
+                  <IconHistory size={16} />
+                  History ({history.length})
+                </button>
+                {mode === "aip" && (
+                  <button
+                    onClick={() => {
+                      if (showHistory && historyPanelView === "lead") {
+                        setShowHistory(false);
+                        return;
+                      }
+                      openHistoryPanel("lead");
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-semibold border flex gap-2 justify-center items-center hover:bg-sky-100 hover:cursor-pointer duration-200 ease-in-out ${
+                      showHistory && historyPanelView === "lead"
+                        ? "bg-sky-600 text-white border-sky-600 hover:bg-sky-500"
+                        : "bg-white text-sky-700 border-sky-200"
+                    }`}
+                  >
+                    <IconHistory size={16} />
+                    Lead Edit History ({leadChangeLog.length})
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -1088,19 +1090,20 @@ export default function ProjectTable({
 
         {isAdmin && (
           <div
+            ref={historyPanelRef}
             className={`bg-white border fixed ${showHistory ? "right-0" : "-right-100"} duration-200 ease-in-out top-25 border-gray-200 rounded-2xl shadow-sm overflow-hidden h-full z-1`}
           >
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-gray-900">
-                {mode === "aip" ? "Lead Change Log" : "Edit History"}
-              </h2>
-              <span className="text-xs text-gray-500">{historyFeed.length} changes</span>
+              <h2 className="text-sm font-bold text-gray-900">{activeHistoryTitle}</h2>
+              <span className="text-xs text-gray-500">
+                {activeHistoryFeed.length} changes
+              </span>
             </div>
             <div className="max-h-full overflow-y-auto divide-y divide-gray-100">
-              {historyFeed.length === 0 ? (
+              {activeHistoryFeed.length === 0 ? (
                 <div className="px-4 py-6 text-sm text-gray-400">No history yet.</div>
               ) : (
-                historyFeed.map((entry) => (
+                activeHistoryFeed.map((entry) => (
                   <div key={entry.id} className="px-4 py-3 text-sm">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold text-gray-800">
@@ -1123,25 +1126,29 @@ export default function ProjectTable({
                         {entry.new_value === null ? "—" : String(entry.new_value)}
                       </span>
                     </div>
-                    {mode === "aip" ? (
-                      <button
-                        onClick={() => jumpToAipChange(entry)}
-                        className="mt-2 text-xs font-semibold text-sky-700 hover:underline"
-                      >
-                        Jump To Row
-                      </button>
-                    ) : entry.edited_by_role !== "lead" &&
-                      entry.change_status === "approved" ? (
+                    <div className="mt-2 flex items-center gap-3 text-xs font-semibold">
+                      {entry.entity_name === "aip_rows" && (
+                        <button
+                          onClick={() => jumpToAipChange(entry)}
+                          className="text-sky-700 hover:underline"
+                        >
+                          Jump To Row
+                        </button>
+                      )}
+                      {entry.action_type === "edit" ||
+                      entry.action_type === "add" ||
+                      entry.action_type === "delete" ? (
                       <button
                         onClick={() => {
                           void restoreHistory(entry);
                         }}
                         disabled={busy}
-                        className="mt-2 text-xs font-semibold text-amber-700 hover:underline disabled:opacity-50"
+                        className="text-amber-700 hover:underline disabled:opacity-50"
                       >
                         Restore
                       </button>
                     ) : null}
+                    </div>
                   </div>
                 ))
               )}
@@ -1151,27 +1158,33 @@ export default function ProjectTable({
 
         {mode === "aip" ? (
           <>
-            {isLead && (
+            {(isLead || isAdmin) && (
               <div className="p-4 rounded-xl border border-gray-200 bg-white">
                 <div className="flex flex-wrap gap-3 items-center justify-between">
                   <div>
-                    <h2 className="text-sm font-semibold text-gray-800">Upload AIP .xlsx</h2>
+                    <h2 className="text-sm font-semibold text-gray-800">
+                      {isLead ? "Upload AIP .xlsx" : "Lead Uploaded AIP Files"}
+                    </h2>
                     <p className="text-xs text-gray-500">
-                      Uploaded rows are editable live, and every lead edit is logged.
+                      {isLead
+                        ? "Uploaded rows are editable live, and every lead edit is logged."
+                        : "Review files submitted by leads and their row totals."}
                     </p>
                   </div>
-                  <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-sky-600 text-white text-sm font-semibold cursor-pointer hover:bg-sky-500">
-                    {uploadingFile ? "Uploading..." : "Upload File"}
-                    <input
-                      type="file"
-                      accept=".xlsx"
-                      onChange={(e) => {
-                        void handleLeadAipUpload(e);
-                      }}
-                      disabled={uploadingFile}
-                      className="hidden"
-                    />
-                  </label>
+                  {isLead && (
+                    <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-sky-600 text-white text-sm font-semibold cursor-pointer hover:bg-sky-500">
+                      {uploadingFile ? "Uploading..." : "Upload File"}
+                      <input
+                        type="file"
+                        accept=".xlsx"
+                        onChange={(e) => {
+                          void handleLeadAipUpload(e);
+                        }}
+                        disabled={uploadingFile}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
                 </div>
 
                 <div className="mt-3">
@@ -1185,7 +1198,10 @@ export default function ProjectTable({
                           key={file.id}
                           className="px-2 py-1.5 text-xs rounded border border-gray-100 bg-gray-50 flex items-center justify-between"
                         >
-                          <span className="font-medium text-gray-700">{file.file_name}</span>
+                          <span className="font-medium text-gray-700">
+                            {file.file_name}
+                            {isAdmin ? ` (Lead #${file.lead_id})` : ""}
+                          </span>
                           <span className="text-gray-500">
                             {file.row_count} rows · {new Date(file.uploaded_at).toLocaleString()}
                           </span>
@@ -1212,17 +1228,6 @@ export default function ProjectTable({
                 {aipYearOptions.map((year) => (
                   <option key={year} value={year}>
                     {year === "All" ? "All Years" : year}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={aipSector}
-                onChange={(e) => setAipSector(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white"
-              >
-                {allSectors.map((sector) => (
-                  <option key={sector} value={sector}>
-                    {sector}
                   </option>
                 ))}
               </select>
@@ -1276,6 +1281,12 @@ export default function ProjectTable({
               handleSort={handleAipSort}
               sortCol={aipSortCol}
               sortDir={aipSortDir}
+              sectorFilter={aipSector}
+              departmentFilter={aipDepartment}
+              sectorOptions={allSectors}
+              departmentOptions={allDepartments}
+              onSectorFilterChange={setAipSector}
+              onDepartmentFilterChange={setAipDepartment}
               cellStatuses={leadCellStatuses}
               commentCountsByCell={commentCountsByCell}
               commentCountsByRow={commentCountsByRow}
@@ -1348,7 +1359,7 @@ export default function ProjectTable({
               handleSort={handleMonitoringSort}
               sortCol={monitoringSortCol}
               sortDir={monitoringSortDir}
-              commentCountsByCell={mergedMonitoringActivityByCell}
+              commentCountsByCell={commentCountsByCell}
               commentCountsByRow={commentCountsByRow}
               onOpenComments={(rowId, field) => openComments(rowId, field)}
             />
@@ -1357,8 +1368,14 @@ export default function ProjectTable({
       </div>
 
       {commentTarget && (
-        <div className="fixed inset-0 bg-black/30 z-30 flex items-center justify-center p-4">
-          <div className="w-full max-w-xl bg-white rounded-2xl border border-gray-200 shadow-xl">
+        <div
+          className="fixed inset-0 bg-black/30 z-30 flex items-center justify-center p-4"
+          onClick={closeComments}
+        >
+          <div
+            className="w-full max-w-xl bg-white rounded-2xl border border-gray-200 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold text-gray-900">Comments</h3>
