@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
+import { departmentOptions, getDepartmentTheme } from "@/lib/leadDepartments";
 
 type GeneratedLink = {
   id: number;
@@ -10,6 +11,7 @@ type GeneratedLink = {
   token: string;
   created_at: string;
   last_accessed_at?: string;
+  lead_department?: string;
   url: string;
 };
 
@@ -18,7 +20,10 @@ type LeadUploadedFile = {
   lead_id: number;
   file_name: string;
   uploaded_at: string;
+  submitted_at?: string | null;
   row_count: number;
+  lead_username?: string;
+  lead_department?: string;
 };
 
 export default function LeadLinksManager(): React.JSX.Element | null {
@@ -28,14 +33,41 @@ export default function LeadLinksManager(): React.JSX.Element | null {
   );
 
   const [linkValue, setLinkValue] = useState("");
-  const [leadUsername, setLeadUsername] = useState("");
+
   const [leadDepartment, setLeadDepartment] = useState("General");
   const [generatedLinks, setGeneratedLinks] = useState<GeneratedLink[]>([]);
-  const [leadUploads, setLeadUploads] = useState<Record<number, LeadUploadedFile[]>>({});
+  const [leadUploads, setLeadUploads] = useState<
+    Record<number, LeadUploadedFile[]>
+  >({});
   const [expandedLeadId, setExpandedLeadId] = useState<number | null>(null);
   const [linkLoading, setLinkLoading] = useState(false);
   const [linkMessage, setLinkMessage] = useState("");
   const [linkError, setLinkError] = useState("");
+
+  const groupedLinks = useMemo(() => {
+    return generatedLinks.reduce(
+      (acc, link) => {
+        const dept = link.lead_department || "General";
+        if (!acc[dept]) {
+          acc[dept] = [];
+        }
+        acc[dept].push(link);
+        return acc;
+      },
+      {} as Record<string, GeneratedLink[]>,
+    );
+  }, [generatedLinks]);
+
+  const groupedDepartments = useMemo(() => {
+    const available = Object.keys(groupedLinks);
+    const ordered = departmentOptions.filter((dept) =>
+      available.includes(dept),
+    );
+    const extras = available.filter(
+      (dept) => !departmentOptions.includes(dept),
+    );
+    return [...ordered, ...extras];
+  }, [groupedLinks]);
 
   const fetchLinks = async () => {
     if (!isAdminView) return;
@@ -79,11 +111,6 @@ export default function LeadLinksManager(): React.JSX.Element | null {
   }, [isAdminView, status]);
 
   const handleGenerateLink = async () => {
-    if (!leadUsername.trim()) {
-      setLinkError("Please enter the lead username first.");
-      return;
-    }
-
     setLinkLoading(true);
     setLinkError("");
     setLinkMessage("");
@@ -94,7 +121,6 @@ export default function LeadLinksManager(): React.JSX.Element | null {
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify({
-          leadUsername: leadUsername.trim(),
           department: leadDepartment.trim() || "General",
         }),
       });
@@ -122,7 +148,19 @@ export default function LeadLinksManager(): React.JSX.Element | null {
 
   const handleCopyLink = async (value: string) => {
     try {
-      await navigator.clipboard.writeText(value);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = value;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "absolute";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
       setLinkMessage("Link copied to clipboard.");
     } catch {
       setLinkError("Failed to copy link.");
@@ -131,7 +169,6 @@ export default function LeadLinksManager(): React.JSX.Element | null {
 
   const handleRefresh = () => {
     setLinkValue("");
-    setLeadUsername("");
     setLeadDepartment("General");
     setLinkMessage("");
     setLinkError("");
@@ -179,7 +216,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
           border-radius: 8px;
           padding: 0 12px;
           outline: none;
-          width: min(280px, 100%);
+          width: 20%;
           color: #2c4a3a;
           background: #ffffff;
         }
@@ -213,6 +250,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
           border-radius: 6px;
           overflow: hidden;
           box-shadow: 0 3px 10px rgba(141, 191, 132, 0.35);
+          width: 100%;
         }
 
         .link-label {
@@ -236,7 +274,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
           color: #2c4a3a;
           background: #ffffff;
           outline: none;
-          width: min(40rem, 76vw);
+          min-width: 100%;
           transition: border-color 0.2s;
         }
 
@@ -293,7 +331,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
         }
 
         .generated-list {
-          width: min(860px, 100%);
+          width: 100%;
           background: rgba(255, 255, 255, 0.7);
           border: 1px solid #d6f0e4;
           border-radius: 10px;
@@ -309,6 +347,53 @@ export default function LeadLinksManager(): React.JSX.Element | null {
           color: #2c4a3a;
           text-transform: uppercase;
           letter-spacing: 0.06em;
+        }
+
+        .department-section {
+          border: 1px solid #e2efe8;
+          border-radius: 10px;
+          overflow: hidden;
+          background: #ffffff;
+        }
+
+        .department-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 8px 10px;
+          border-bottom: 1px solid #e2efe8;
+        }
+
+        .department-badge {
+          font-size: 11px;
+          font-weight: 700;
+          padding: 4px 8px;
+          border-radius: 999px;
+          border: 1px solid;
+        }
+
+        .department-meta {
+          font-size: 11px;
+          color: #3b5c50;
+        }
+
+        .department-links {
+          padding: 8px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .department-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 10px;
+          font-weight: 700;
+          border-radius: 999px;
+          padding: 2px 8px;
+          border: 1px solid;
+          margin-left: 6px;
         }
 
         .generated-item {
@@ -388,40 +473,36 @@ export default function LeadLinksManager(): React.JSX.Element | null {
       `}</style>
 
       <div className="lead-row">
-        <input
-          type="text"
+        <select
           className="lead-input"
-          placeholder="Lead username (e.g. lead1)"
-          value={leadUsername}
-          onChange={(e) => setLeadUsername(e.target.value)}
-        />
-        <input
-          type="text"
-          className="lead-input"
-          placeholder="Department (e.g. Engineering)"
           value={leadDepartment}
           onChange={(e) => setLeadDepartment(e.target.value)}
-        />
-        <button
-          type="button"
-          className="generate-btn"
-          onClick={handleGenerateLink}
-          disabled={linkLoading || !isAdminView}
         >
-          {linkLoading ? "Generating..." : "Generate Lead Link"}
-        </button>
-      </div>
-
-      <div className="link-row">
-        <div className="link-combined">
-          <span className="link-label">LINK</span>
-          <input
-            type="text"
-            className="link-input"
-            placeholder="Generated lead link appears here..."
-            value={linkValue}
-            onChange={(e) => setLinkValue(e.target.value)}
-          />
+          {departmentOptions.map((department) => (
+            <option key={department} value={department}>
+              {department}
+            </option>
+          ))}
+        </select>
+        <div className="link-row">
+          <div className="link-combined">
+            <span className="link-label">LINK</span>
+            <input
+              type="text"
+              className="link-input"
+              placeholder="Generated lead link appears here..."
+              value={linkValue}
+              onChange={(e) => setLinkValue(e.target.value)}
+            />
+          </div>
+          <button
+            type="button"
+            className="generate-btn"
+            onClick={handleGenerateLink}
+            disabled={linkLoading || !isAdminView}
+          >
+            {linkLoading ? "Generating..." : "Generate Lead Link"}
+          </button>
         </div>
 
         <button
@@ -470,60 +551,111 @@ export default function LeadLinksManager(): React.JSX.Element | null {
 
       {generatedLinks.length > 0 ? (
         <div className="generated-list">
-          <div className="generated-title">Generated Links</div>
-          {generatedLinks.map((entry) => (
-            <div className="generated-item" key={entry.id}>
-              <div className="generated-meta">
-                <strong>{entry.lead_username}</strong> |{" "}
-                {new Date(entry.created_at).toLocaleString()}
-                {entry.last_accessed_at
-                  ? ` | Last used: ${new Date(entry.last_accessed_at).toLocaleString()}`
-                  : " | Not used yet"}
-              </div>
-              <div className="generated-actions">
-                <button
-                  type="button"
-                  className="view-btn"
-                  onClick={() =>
-                    setExpandedLeadId((prev) =>
-                      prev === entry.lead_id ? null : entry.lead_id,
-                    )
-                  }
+          <div className="generated-title">Generated Links by Department</div>
+          {groupedDepartments.map((department) => {
+            const theme = getDepartmentTheme(department);
+            const entries = groupedLinks[department] || [];
+            if (entries.length === 0) return null;
+            return (
+              <div className="department-section" key={department}>
+                <div
+                  className="department-header"
+                  style={{
+                    background: theme.color.bg,
+                    borderColor: theme.color.border,
+                  }}
                 >
-                  {expandedLeadId === entry.lead_id
-                    ? "Hide Uploaded Files"
-                    : "View Uploaded Files"}
-                </button>
-                <button
-                  type="button"
-                  className="copy-btn"
-                  onClick={() => handleCopyLink(entry.url)}
-                >
-                  Copy Link
-                </button>
-              </div>
-
-              {expandedLeadId === entry.lead_id ? (
-                <div className="uploads-panel">
-                  {(leadUploads[entry.lead_id] || []).length === 0 ? (
-                    <div className="uploads-empty">
-                      No files uploaded by this lead yet.
-                    </div>
-                  ) : (
-                    (leadUploads[entry.lead_id] || []).map((file) => (
-                      <div className="uploads-item" key={file.id}>
-                        <span>{file.file_name}</span>
-                        <span>
-                          {file.row_count} rows |{" "}
-                          {new Date(file.uploaded_at).toLocaleString()}
-                        </span>
-                      </div>
-                    ))
-                  )}
+                  <span
+                    className="department-badge"
+                    style={{
+                      color: theme.color.text,
+                      borderColor: theme.color.border,
+                      background: "#ffffff",
+                    }}
+                  >
+                    {department}
+                  </span>
+                  <span className="department-meta">
+                    {entries.length} lead{entries.length > 1 ? "s" : ""}
+                  </span>
                 </div>
-              ) : null}
-            </div>
-          ))}
+                <div className="department-links">
+                  {entries.map((entry) => {
+                    const entryTheme = getDepartmentTheme(
+                      entry.lead_department || department,
+                    );
+                    return (
+                      <div className="generated-item" key={entry.id}>
+                        <div className="generated-meta">
+                          <strong>
+                            {entry.lead_username || "Unclaimed lead"}
+                          </strong>
+                          <span
+                            className="department-chip"
+                            style={{
+                              background: entryTheme.color.bg,
+                              color: entryTheme.color.text,
+                              borderColor: entryTheme.color.border,
+                            }}
+                          >
+                            {entryTheme.label}
+                          </span>{" "}
+                          | {new Date(entry.created_at).toLocaleString()}
+                          {entry.last_accessed_at
+                            ? ` | Last used: ${new Date(entry.last_accessed_at).toLocaleString()}`
+                            : " | Not used yet"}
+                        </div>
+                        <div className="generated-actions">
+                          <button
+                            type="button"
+                            className="view-btn"
+                            onClick={() =>
+                              setExpandedLeadId((prev) =>
+                                prev === entry.lead_id ? null : entry.lead_id,
+                              )
+                            }
+                          >
+                            {expandedLeadId === entry.lead_id
+                              ? "Hide Uploaded Files"
+                              : "View Uploaded Files"}
+                          </button>
+                          <button
+                            type="button"
+                            className="copy-btn"
+                            onClick={() => handleCopyLink(entry.url)}
+                          >
+                            Copy Link
+                          </button>
+                        </div>
+
+                        {expandedLeadId === entry.lead_id ? (
+                          <div className="uploads-panel">
+                            {(leadUploads[entry.lead_id] || []).length === 0 ? (
+                              <div className="uploads-empty">
+                                No files uploaded by this lead yet.
+                              </div>
+                            ) : (
+                              (leadUploads[entry.lead_id] || []).map((file) => (
+                                <div className="uploads-item" key={file.id}>
+                                  <span>{file.file_name}</span>
+                                  <span>
+                                    {file.row_count} rows |{" "}
+                                    {new Date(
+                                      file.uploaded_at,
+                                    ).toLocaleString()}
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
       ) : null}
     </section>

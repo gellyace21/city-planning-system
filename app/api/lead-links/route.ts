@@ -13,6 +13,7 @@ type LeadLink = {
   created_by_admin: number;
   created_at: string;
   last_accessed_at?: string;
+  lead_department?: string;
 };
 
 type LeadFile = {
@@ -21,6 +22,10 @@ type LeadFile = {
   file_name: string;
   uploaded_at: string;
   row_count: number;
+  lead_username?: string;
+  lead_department?: string;
+  submitted_at?: string | null;
+  is_submitted?: boolean;
 };
 
 const DB_PATH = path.join(process.cwd(), "db.json");
@@ -55,20 +60,38 @@ export async function GET(request: NextRequest) {
     const db = await readDb();
     const links: LeadLink[] = db.generated_links || [];
     const leadFiles: LeadFile[] = (db.lead_files || []) as LeadFile[];
+    const leads: Array<{ id: number; username: string; department?: string }> =
+      db.leads || [];
+    const leadById = new Map(leads.map((lead) => [Number(lead.id), lead]));
     const origin = request.nextUrl.origin;
 
     const result = links
       .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
-      .map((link) => ({
-        ...link,
-        url: `${origin}/lead-access/${link.token}`,
-      }));
+      .map((link) => {
+        const lead = leadById.get(Number(link.lead_id));
+        return {
+          ...link,
+          lead_username:
+            lead?.username || link.lead_username || `Lead ${link.lead_id}`,
+          lead_department: lead?.department || "General",
+          url: `${origin}/lead-access/${link.token}`,
+        };
+      });
 
     const files = leadFiles
+      .filter((file) => file.is_submitted ?? Boolean(file.submitted_at))
       .slice()
       .sort((a, b) =>
         String(b.uploaded_at).localeCompare(String(a.uploaded_at)),
-      );
+      )
+      .map((file) => {
+        const lead = leadById.get(Number(file.lead_id));
+        return {
+          ...file,
+          lead_username: lead?.username || `Lead ${file.lead_id}`,
+          lead_department: lead?.department || "General",
+        };
+      });
 
     return NextResponse.json({ links: result, leadFiles: files });
   } catch (error) {
@@ -93,23 +116,19 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const leadUsername = String(body?.leadUsername || "").trim();
     const leadDepartment = String(body?.department || "General").trim();
-
-    if (!leadUsername) {
-      return NextResponse.json(
-        { error: "Lead username is required" },
-        { status: 400 },
-      );
-    }
+    const hasLeadUsername = Boolean(leadUsername);
 
     const db = await readDb();
     if (!db.leads) {
       db.leads = [];
     }
     const leads = db.leads || [];
-    let lead = leads.find(
-      (entry: { username: string; id: number }) =>
-        entry.username.toLowerCase() === leadUsername.toLowerCase(),
-    );
+    let lead = hasLeadUsername
+      ? leads.find(
+          (entry: { username: string; id: number }) =>
+            entry.username.toLowerCase() === leadUsername.toLowerCase(),
+        )
+      : null;
 
     // Auto-create lead records from the admin link flow.
     // Password is set on first token access.
@@ -117,7 +136,7 @@ export async function POST(request: NextRequest) {
       lead = {
         id: nextId(leads),
         token: makeToken(),
-        username: leadUsername,
+        username: leadUsername || "",
         password_hash: "",
         is_active: true,
         department: leadDepartment || "General",
@@ -140,6 +159,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         link: {
           ...existing,
+          lead_department: lead?.department || "General",
           url: `${origin}/lead-access/${existing.token}`,
           reused: true,
         },
@@ -163,6 +183,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       link: {
         ...newLink,
+        lead_department: lead?.department || "General",
         url: `${origin}/lead-access/${newLink.token}`,
       },
     });

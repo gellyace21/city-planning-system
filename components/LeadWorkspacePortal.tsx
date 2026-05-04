@@ -2,17 +2,25 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { parseAIPExcel } from "@/lib/aipExport";
 import {
+  deleteLeadUploadedFileAction,
+  fetchLeadFileCommentsAction,
   fetchLeadUploadedFilesAction,
+  submitLeadUploadAction,
   uploadLeadAipFileAction,
 } from "@/lib/services/projectMonitoringActions";
+import { getDepartmentTheme } from "@/lib/leadDepartments";
+import { FileCommentEntry } from "@/components/project-monitoring/types";
 
 type UploadedLeadFile = {
   id: number;
   file_name: string;
   uploaded_at: string;
   row_count: number;
+  is_submitted: boolean;
+  submitted_at?: string | null;
 };
 
 const formatSize = (bytes: number): string => {
@@ -23,6 +31,8 @@ const formatSize = (bytes: number): string => {
 
 export default function LeadWorkspacePortal(): React.JSX.Element {
   const router = useRouter();
+  const { data: session } = useSession();
+  const departmentTheme = getDepartmentTheme(session?.user?.department);
 
   const [projectDate, setProjectDate] = useState<string>("");
   const [projectSector, setProjectSector] = useState<string>("");
@@ -31,6 +41,10 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
   const [uploading, setUploading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
+  const [submittingFileId, setSubmittingFileId] = useState<number | null>(null);
+  const [fileComments, setFileComments] = useState<FileCommentEntry[]>([]);
+  const [fileCommentTarget, setFileCommentTarget] =
+    useState<UploadedLeadFile | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -43,11 +57,39 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
     })();
   }, []);
 
+  useEffect(() => {
+    void (async () => {
+      try {
+        const comments = await fetchLeadFileCommentsAction();
+        setFileComments(comments);
+      } catch {
+        setFileComments([]);
+      }
+    })();
+  }, []);
+
   const fileNameDisplay = useMemo(() => {
     if (stagedFiles.length === 0) return "No File Chosen";
     if (stagedFiles.length === 1) return stagedFiles[0].name;
     return `${stagedFiles.length} files selected`;
   }, [stagedFiles]);
+
+  const fileCommentCountsById = useMemo(() => {
+    return fileComments.reduce(
+      (acc, comment) => {
+        acc[comment.file_id] = (acc[comment.file_id] || 0) + 1;
+        return acc;
+      },
+      {} as Record<number, number>,
+    );
+  }, [fileComments]);
+
+  const fileCommentThread = useMemo(() => {
+    if (!fileCommentTarget) return [];
+    return fileComments
+      .filter((comment) => comment.file_id === fileCommentTarget.id)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+  }, [fileComments, fileCommentTarget]);
 
   const onUpload = async (): Promise<void> => {
     if (stagedFiles.length === 0) return;
@@ -66,7 +108,7 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
       setUploadedFiles(files);
       setStagedFiles([]);
       setSuccess(
-        "File upload complete. Click an uploaded file to edit it as a table.",
+        "File upload complete. Review the file and submit it when ready.",
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to upload file.");
@@ -79,6 +121,62 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
     router.push(
       `/dashboard/annual-investment-plan?view=table&fileId=${fileId}`,
     );
+  };
+
+  const openFileComments = (file: UploadedLeadFile): void => {
+    setFileCommentTarget(file);
+  };
+
+  const closeFileComments = (): void => {
+    setFileCommentTarget(null);
+  };
+
+  const handleSubmitFile = async (fileId: number): Promise<void> => {
+    if (
+      !window.confirm(
+        "Submit this file? After submission, it will be locked and visible to admins.",
+      )
+    ) {
+      return;
+    }
+    setSubmittingFileId(fileId);
+    setError("");
+    setSuccess("");
+    try {
+      await submitLeadUploadAction(fileId);
+      const files = await fetchLeadUploadedFilesAction();
+      setUploadedFiles(files);
+      setSuccess("File submitted. Admins can now review it.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to submit file.");
+    } finally {
+      setSubmittingFileId(null);
+    }
+  };
+
+  const handleDeleteFile = async (fileId: number): Promise<void> => {
+    if (
+      !window.confirm(
+        "Delete this uploaded file and its rows? This cannot be undone.",
+      )
+    ) {
+      return;
+    }
+    setUploading(true);
+    setError("");
+    setSuccess("");
+    try {
+      await deleteLeadUploadedFileAction(fileId);
+      const files = await fetchLeadUploadedFilesAction();
+      setUploadedFiles(files);
+      const comments = await fetchLeadFileCommentsAction();
+      setFileComments(comments);
+      setSuccess("File deleted.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete file.");
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -318,6 +416,20 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
           gap: 10px;
         }
 
+        .department-pill {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.4px;
+          border-radius: 999px;
+          padding: 6px 14px;
+          border: 1px solid;
+          margin: -12px auto 24px;
+          width: fit-content;
+        }
+
         .file-item {
           width: 100%;
           display: flex;
@@ -327,19 +439,32 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
           background: #e8f8f2;
           border: 1px solid #b2dece;
           border-radius: 8px;
-          text-align: left;
-          cursor: pointer;
           transition:
             transform 0.14s ease,
             box-shadow 0.2s ease,
             border-color 0.2s ease;
         }
 
-        .file-item:hover,
-        .file-item:focus-visible {
+        .file-item:hover {
           transform: translateY(-1px);
           border-color: #2a7a5a;
           box-shadow: 0 8px 20px rgba(42, 122, 90, 0.16);
+        }
+
+        .file-main {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          background: transparent;
+          border: none;
+          text-align: left;
+          cursor: pointer;
+          padding: 0;
+        }
+
+        .file-main:focus-visible {
           outline: none;
         }
 
@@ -377,6 +502,69 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
           margin-top: 2px;
         }
 
+        .file-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-shrink: 0;
+        }
+
+        .file-action-btn {
+          border: 1px solid #cbe7db;
+          border-radius: 999px;
+          background: #ffffff;
+          color: #2a7a5a;
+          font-size: 11px;
+          font-weight: 700;
+          padding: 6px 10px;
+          cursor: pointer;
+          transition: background 0.2s;
+          white-space: nowrap;
+        }
+
+        .file-action-btn:hover {
+          background: #f1faf6;
+        }
+
+        .file-action-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          background: #f3f4f6;
+        }
+
+        .file-status {
+          display: inline-flex;
+          align-items: center;
+          padding: 2px 8px;
+          border-radius: 999px;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.3px;
+          border: 1px solid transparent;
+        }
+
+        .file-status.draft {
+          background: #fff7ed;
+          color: #9a3412;
+          border-color: #fdba74;
+        }
+
+        .file-status.submitted {
+          background: #e7f6ef;
+          color: #1d6e4b;
+          border-color: #a6d5c1;
+        }
+
+        .file-action-btn.danger {
+          border-color: #f2b8b5;
+          color: #b42318;
+          background: #fff7f7;
+        }
+
+        .file-action-btn.danger:hover {
+          background: #fdecec;
+        }
+
         .edit-hint {
           padding: 4px 10px;
           border-radius: 999px;
@@ -394,10 +582,73 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
           white-space: nowrap;
         }
 
-        .file-item:hover .edit-hint,
-        .file-item:focus-visible .edit-hint {
+        .file-main:hover .edit-hint,
+        .file-main:focus-visible .edit-hint {
           opacity: 1;
           transform: translateX(0);
+        }
+
+        .modal-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 16px;
+          z-index: 50;
+        }
+
+        .modal-card {
+          background: #ffffff;
+          border: 1px solid #e5e7eb;
+          border-radius: 16px;
+          max-width: 560px;
+          width: 100%;
+          box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18);
+        }
+
+        .modal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 18px 20px;
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        .modal-body {
+          padding: 16px 20px;
+        }
+
+        .comment-thread {
+          max-height: 260px;
+          overflow: auto;
+          border: 1px solid #f0f2f4;
+          border-radius: 12px;
+        }
+
+        .comment-item {
+          padding: 12px 14px;
+          border-bottom: 1px solid #f0f2f4;
+        }
+
+        .comment-meta {
+          font-size: 12px;
+          color: #6b7280;
+          margin-bottom: 6px;
+        }
+
+        .comment-text {
+          font-size: 13px;
+          color: #1f2937;
+          white-space: pre-wrap;
+        }
+
+        .comment-empty {
+          padding: 20px;
+          text-align: center;
+          font-size: 13px;
+          color: #9ca3af;
         }
 
         @media (max-width: 640px) {
@@ -426,6 +677,16 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
 
       <main className="workspace-main">
         <h1 className="page-title">Implementation Lead Portal</h1>
+        <div
+          className="department-pill"
+          style={{
+            background: departmentTheme.color.bg,
+            color: departmentTheme.color.text,
+            borderColor: departmentTheme.color.border,
+          }}
+        >
+          {departmentTheme.label}
+        </div>
 
         <div className="top-bar">
           <div className="field-group">
@@ -504,25 +765,76 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
             <div className="empty-state">No file uploaded yet</div>
           ) : (
             <div className="file-list">
-              {uploadedFiles.map((file) => (
-                <button
-                  key={file.id}
-                  type="button"
-                  className="file-item"
-                  onClick={() => openTableEditor(file.id)}
-                  title="Open and edit this file as a table"
-                >
-                  <div className="file-icon">AIP</div>
-                  <div className="file-info">
-                    <div className="file-info-name">{file.file_name}</div>
-                    <div className="file-info-meta">
-                      {file.row_count} rows •{" "}
-                      {new Date(file.uploaded_at).toLocaleString()}
+              {uploadedFiles.map((file) => {
+                const commentCount = fileCommentCountsById[file.id] ?? 0;
+                const isSubmitted = Boolean(
+                  file.is_submitted || file.submitted_at,
+                );
+                return (
+                  <div key={file.id} className="file-item">
+                    <button
+                      type="button"
+                      className="file-main"
+                      onClick={() => openTableEditor(file.id)}
+                      title="Open and edit this file as a table"
+                    >
+                      <div className="file-icon">AIP</div>
+                      <div className="file-info">
+                        <div className="file-info-name">{file.file_name}</div>
+                        <div className="file-info-meta">
+                          {file.row_count} rows •{" "}
+                          {new Date(file.uploaded_at).toLocaleString()} •{" "}
+                          <span
+                            className={`file-status ${
+                              isSubmitted ? "submitted" : "draft"
+                            }`}
+                          >
+                            {isSubmitted ? "Submitted" : "Draft"}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="edit-hint">
+                        {isSubmitted
+                          ? "View submitted file"
+                          : "Click to edit before submitting"}
+                      </span>
+                    </button>
+                    <div className="file-actions">
+                      {!isSubmitted ? (
+                        <button
+                          type="button"
+                          className="file-action-btn"
+                          onClick={() => {
+                            void handleSubmitFile(file.id);
+                          }}
+                          disabled={submittingFileId === file.id}
+                        >
+                          {submittingFileId === file.id
+                            ? "Submitting..."
+                            : "Submit"}
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="file-action-btn"
+                        onClick={() => openFileComments(file)}
+                      >
+                        Comments{commentCount ? ` (${commentCount})` : ""}
+                      </button>
+                      <button
+                        type="button"
+                        className="file-action-btn danger"
+                        onClick={() => {
+                          void handleDeleteFile(file.id);
+                        }}
+                        disabled={isSubmitted}
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
-                  <span className="edit-hint">Click to edit as table</span>
-                </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
@@ -548,6 +860,52 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
               ))}
             </div>
           </section>
+        ) : null}
+
+        {fileCommentTarget ? (
+          <div className="modal-backdrop" onClick={closeFileComments}>
+            <div
+              className="modal-card"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="modal-header">
+                <div>
+                  <h3 className="card-label">File Comments</h3>
+                  <p className="file-info-meta">
+                    {fileCommentTarget.file_name}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="file-action-btn"
+                  onClick={closeFileComments}
+                >
+                  Close
+                </button>
+              </div>
+              <div className="modal-body">
+                {fileCommentThread.length === 0 ? (
+                  <div className="comment-empty">
+                    No comments for this file yet.
+                  </div>
+                ) : (
+                  <div className="comment-thread">
+                    {fileCommentThread.map((comment) => (
+                      <div key={comment.id} className="comment-item">
+                        <div className="comment-meta">
+                          {comment.created_by_name} ({comment.created_by_role})
+                          · {new Date(comment.created_at).toLocaleString()}
+                        </div>
+                        <div className="comment-text">
+                          {comment.comment_text}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         ) : null}
       </main>
     </div>

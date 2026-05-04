@@ -9,14 +9,18 @@ import React, {
 } from "react";
 import {
   addCommentAction,
+  addLeadFileCommentAction,
   createAipRowAction,
   createMonitoringRowAction,
   deleteAipRowsAction,
+  deleteLeadUploadedFileAction,
   deleteMonitoringRowsAction,
   fetchCommentsAction,
+  fetchLeadFileCommentsAction,
   fetchLeadUploadedFilesAction,
   fetchProjectMonitoringDataAction,
   restoreHistoryEntryAction,
+  submitLeadUploadAction,
   uploadLeadAipFileAction,
   updateAipRowFieldAction,
   updateMonitoringRowFieldAction,
@@ -28,6 +32,8 @@ import {
   CommentEntry,
   EditCell,
   EditHistoryEntry,
+  FileCommentEntry,
+  LeadFileSummary,
   MonitoringEditCell,
   MonitoringRow,
   MonitoringSortKey,
@@ -45,7 +51,6 @@ import { downloadAIP, parseAIPExcel } from "@/lib/aipExport";
 import { useSession } from "next-auth/react";
 
 type ActiveDataset = "aip" | "monitoring";
-type HistoryPanelView = "all" | "lead";
 
 type ChangeOperation = {
   dataset: ActiveDataset;
@@ -78,6 +83,7 @@ interface ProjectTableProps {
   initialAipRows: AIPRow[];
   initialMonitoringRows: MonitoringRow[];
   initialHistory: EditHistoryEntry[];
+  initialUploadId?: number | null;
 }
 
 const toYear = (value: string): number | null => {
@@ -86,11 +92,7 @@ const toYear = (value: string): number | null => {
 };
 
 const makeInitials = (name: string): string => {
-  const parts = name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2);
+  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
   if (parts.length === 0) return "U";
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
 };
@@ -100,6 +102,7 @@ export default function ProjectTable({
   initialAipRows,
   initialMonitoringRows,
   initialHistory,
+  initialUploadId,
 }: ProjectTableProps): React.JSX.Element {
   const { data: session } = useSession();
   const actorRole = session?.user?.role;
@@ -109,22 +112,22 @@ export default function ProjectTable({
   const [busy, setBusy] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [showHistory, setShowHistory] = useState<boolean>(false);
-  const [historyPanelView, setHistoryPanelView] = useState<HistoryPanelView>(
-    "all",
-  );
   const [history, setHistory] = useState<EditHistoryEntry[]>(initialHistory);
-  const [leadFiles, setLeadFiles] = useState<
-    {
-      id: number;
-      lead_id: number;
-      file_name: string;
-      uploaded_at: string;
-      row_count: number;
-    }[]
-  >([]);
+  const [leadFiles, setLeadFiles] = useState<LeadFileSummary[]>([]);
   const [uploadingFile, setUploadingFile] = useState<boolean>(false);
+  const [selectedUploadId, setSelectedUploadId] = useState<number | "all">(
+    typeof initialUploadId === "number" && Number.isFinite(initialUploadId)
+      ? initialUploadId
+      : "all",
+  );
 
   const [comments, setComments] = useState<CommentEntry[]>([]);
+  const [fileComments, setFileComments] = useState<FileCommentEntry[]>([]);
+  const [fileCommentTarget, setFileCommentTarget] =
+    useState<LeadFileSummary | null>(null);
+  const [fileCommentDraft, setFileCommentDraft] = useState<string>("");
+  const [fileCommentSubmitting, setFileCommentSubmitting] =
+    useState<boolean>(false);
   const [commentTarget, setCommentTarget] = useState<{
     rowId: number;
     field: string;
@@ -239,7 +242,9 @@ export default function ProjectTable({
           .filter((value): value is number => Number.isFinite(value))
           .map((value) => String(value)),
       ),
-    ].sort((a, b) => (a === "All" ? -1 : b === "All" ? 1 : Number(a) - Number(b)));
+    ].sort((a, b) =>
+      a === "All" ? -1 : b === "All" ? 1 : Number(a) - Number(b),
+    );
   }, [visibleAipRows]);
 
   const monitoringYearOptions = useMemo(() => {
@@ -251,8 +256,46 @@ export default function ProjectTable({
           .filter((value): value is number => Number.isFinite(value))
           .map((value) => String(value)),
       ),
-    ].sort((a, b) => (a === "All" ? -1 : b === "All" ? 1 : Number(a) - Number(b)));
+    ].sort((a, b) =>
+      a === "All" ? -1 : b === "All" ? 1 : Number(a) - Number(b),
+    );
   }, [monitoringRows]);
+
+  const selectedUpload = useMemo(() => {
+    if (selectedUploadId === "all") return null;
+    return leadFiles.find((file) => file.id === selectedUploadId) || null;
+  }, [leadFiles, selectedUploadId]);
+
+  const isLeadRowLocked = (rowId: number): boolean => {
+    if (!isLead) return false;
+    const row = aipRows.find((item) => item.id === rowId);
+    if (!row?.upload_id) return false;
+    const file = leadFiles.find((entry) => entry.id === row.upload_id);
+    return Boolean(file?.is_submitted || file?.submitted_at);
+  };
+
+  const leadFilesByDepartment = useMemo(() => {
+    const grouped: Record<string, Record<number, LeadFileSummary[]>> = {};
+    for (const file of leadFiles) {
+      const department = file.department || "General";
+      if (!grouped[department]) grouped[department] = {};
+      if (!grouped[department][file.lead_id]) {
+        grouped[department][file.lead_id] = [];
+      }
+      grouped[department][file.lead_id].push(file);
+    }
+    return grouped;
+  }, [leadFiles]);
+
+  const fileCommentCountsByFileId = useMemo(() => {
+    return fileComments.reduce(
+      (acc, comment) => {
+        acc[comment.file_id] = (acc[comment.file_id] || 0) + 1;
+        return acc;
+      },
+      {} as Record<number, number>,
+    );
+  }, [fileComments]);
 
   const filteredAip = useMemo(() => {
     return visibleAipRows
@@ -262,6 +305,9 @@ export default function ProjectTable({
       )
       .filter((row) =>
         aipYear === "All" ? true : String(row.year ?? "") === aipYear,
+      )
+      .filter((row) =>
+        selectedUploadId === "all" ? true : row.upload_id === selectedUploadId,
       )
       .filter((row) => {
         if (!aipSearch.trim()) return true;
@@ -293,6 +339,7 @@ export default function ProjectTable({
     aipSearch,
     aipSortCol,
     aipSortDir,
+    selectedUploadId,
   ]);
 
   const filteredMonitoring = useMemo(() => {
@@ -371,49 +418,43 @@ export default function ProjectTable({
     return result;
   }, [history]);
 
-  const leadChangeLog = useMemo(() => {
-    return history.filter(
-      (entry) =>
-        entry.entity_name === "aip_rows" &&
-        entry.edited_by_role === "lead" &&
-        entry.action_type === "edit",
-    );
-  }, [history]);
+  const activeHistoryFeed = useMemo(() => history, [history]);
 
-  const activeHistoryFeed = useMemo(() => {
-    if (mode === "aip" && historyPanelView === "lead") {
-      return leadChangeLog;
-    }
-    return history;
-  }, [history, historyPanelView, leadChangeLog, mode]);
+  const activeHistoryTitle = "Edit History";
 
-  const activeHistoryTitle =
-    mode === "aip" && historyPanelView === "lead"
-      ? "Lead Edit History"
-      : "Edit History";
-
-  const openHistoryPanel = (view: HistoryPanelView): void => {
-    setHistoryPanelView(view);
+  const openHistoryPanel = (): void => {
     setShowHistory(true);
   };
 
+  const scopedComments = useMemo(() => {
+    if (mode !== "aip" || selectedUploadId === "all") {
+      return comments;
+    }
+    const rowIds = new Set(
+      aipRows
+        .filter((row) => row.upload_id === selectedUploadId)
+        .map((row) => row.id),
+    );
+    return comments.filter((comment) => rowIds.has(comment.row_id));
+  }, [comments, mode, selectedUploadId, aipRows]);
+
   const commentCountsByCell = useMemo(() => {
     const mapped: Record<string, number> = {};
-    for (const comment of comments) {
+    for (const comment of scopedComments) {
       const key = `${comment.row_id}:${comment.column_name}`;
       mapped[key] = (mapped[key] ?? 0) + 1;
     }
     return mapped;
-  }, [comments]);
+  }, [scopedComments]);
 
   const commentCountsByRow = useMemo(() => {
     const mapped: Record<string, number> = {};
-    for (const comment of comments) {
+    for (const comment of scopedComments) {
       const key = String(comment.row_id);
       mapped[key] = (mapped[key] ?? 0) + 1;
     }
     return mapped;
-  }, [comments]);
+  }, [scopedComments]);
 
   const commentThread = useMemo(() => {
     if (!commentTarget) return [];
@@ -426,6 +467,13 @@ export default function ProjectTable({
       .sort((a, b) => a.created_at.localeCompare(b.created_at));
   }, [comments, commentTarget]);
 
+  const fileCommentThread = useMemo(() => {
+    if (!fileCommentTarget) return [];
+    return fileComments
+      .filter((comment) => comment.file_id === fileCommentTarget.id)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+  }, [fileComments, fileCommentTarget]);
+
   const refreshComments = async (): Promise<void> => {
     try {
       const data = await fetchCommentsAction(entityName);
@@ -435,12 +483,28 @@ export default function ProjectTable({
     }
   };
 
+  const refreshFileComments = async (): Promise<void> => {
+    try {
+      const data = await fetchLeadFileCommentsAction();
+      setFileComments(data);
+    } catch {
+      setFileComments([]);
+    }
+  };
+
   useEffect(() => {
     if (!session?.user) return;
     void (async () => {
       await refreshComments();
     })();
   }, [session?.user?.id, session?.user?.role, entityName]);
+
+  useEffect(() => {
+    if (!session?.user) return;
+    void (async () => {
+      await refreshFileComments();
+    })();
+  }, [session?.user?.id, session?.user?.role]);
 
   useEffect(() => {
     if (!showHistory) return;
@@ -502,7 +566,9 @@ export default function ProjectTable({
       : String(rawValue);
 
     const result = await updateAipRowFieldAction(rowId, field, value);
-    setAipRows((prev) => prev.map((item) => (item.id === rowId ? result.row : item)));
+    setAipRows((prev) =>
+      prev.map((item) => (item.id === rowId ? result.row : item)),
+    );
     if (result.historyEntry) {
       pushHistory(result.historyEntry);
     }
@@ -560,9 +626,19 @@ export default function ProjectTable({
 
   const commitAipEdit = async (): Promise<void> => {
     if (!aipEditCell) return;
+    if (isLead && isLeadRowLocked(aipEditCell.rowId)) {
+      setErrorMsg("This file is submitted and locked.");
+      setAipEditCell(null);
+      setAipEditValue("");
+      return;
+    }
     setBusy(true);
     try {
-      await applyAipFieldChange(aipEditCell.rowId, aipEditCell.field, aipEditValue);
+      await applyAipFieldChange(
+        aipEditCell.rowId,
+        aipEditCell.field,
+        aipEditValue,
+      );
       setAipEditCell(null);
       setAipEditValue("");
       setErrorMsg("");
@@ -630,7 +706,12 @@ export default function ProjectTable({
     setBusy(true);
     try {
       if (op.dataset === "aip") {
-        await applyAipFieldChange(op.rowId, op.field as keyof AIPRow, op.nextValue, false);
+        await applyAipFieldChange(
+          op.rowId,
+          op.field as keyof AIPRow,
+          op.nextValue,
+          false,
+        );
       } else {
         await applyMonitoringFieldChange(
           op.rowId,
@@ -679,6 +760,10 @@ export default function ProjectTable({
     field: keyof AIPRow,
     currentVal: string | number,
   ): void => {
+    if (isLead && isLeadRowLocked(rowId)) {
+      setErrorMsg("This file is submitted and locked.");
+      return;
+    }
     setErrorMsg("");
     setAipEditCell({ rowId, field });
     setAipEditValue(String(currentVal));
@@ -937,6 +1022,101 @@ export default function ProjectTable({
     }
   };
 
+  const openFileComments = (file: LeadFileSummary): void => {
+    setFileCommentTarget(file);
+    setFileCommentDraft("");
+  };
+
+  const closeFileComments = (): void => {
+    setFileCommentTarget(null);
+    setFileCommentDraft("");
+  };
+
+  const submitFileComment = async (): Promise<void> => {
+    if (!isAdmin) {
+      setErrorMsg("Only admins can add file comments.");
+      return;
+    }
+    if (!fileCommentTarget || !fileCommentDraft.trim()) return;
+    setFileCommentSubmitting(true);
+    try {
+      const created = await addLeadFileCommentAction({
+        file_id: fileCommentTarget.id,
+        comment_text: fileCommentDraft,
+      });
+      setFileComments((prev) => [created, ...prev]);
+      setFileCommentDraft("");
+    } catch (error) {
+      handleFailure(error);
+    } finally {
+      setFileCommentSubmitting(false);
+    }
+  };
+
+  const selectLeadUpload = (file: LeadFileSummary): void => {
+    setSelectedUploadId(file.id);
+    setAipSearch("");
+    setAipSector("All");
+    setAipDepartment("All");
+    setAipYear("All");
+  };
+
+  const clearLeadUploadFilter = (): void => {
+    setSelectedUploadId("all");
+  };
+
+  const handleSubmitLeadFile = async (fileId: number): Promise<void> => {
+    if (
+      !window.confirm(
+        "Submit this file? After submission, it will be locked and visible to admins.",
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setErrorMsg("");
+    try {
+      await submitLeadUploadAction(fileId);
+      const files = await fetchLeadUploadedFilesAction();
+      setLeadFiles(files);
+      if (selectedUploadId === fileId) {
+        setSelectedUploadId(fileId);
+      }
+    } catch (error) {
+      handleFailure(error);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDeleteLeadFile = async (fileId: number): Promise<void> => {
+    if (
+      !window.confirm(
+        "Delete this uploaded file and its rows? This cannot be undone.",
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await deleteLeadUploadedFileAction(fileId);
+      setAipRows((prev) =>
+        prev.filter((row) => !result.removedRowIds.includes(row.id)),
+      );
+      const files = await fetchLeadUploadedFilesAction();
+      setLeadFiles(files);
+      await refreshFileComments();
+      if (selectedUploadId === fileId) {
+        setSelectedUploadId("all");
+      }
+      setErrorMsg("");
+    } catch (error) {
+      handleFailure(error);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handlePrint = (): void => {
     window.print();
   };
@@ -959,7 +1139,9 @@ export default function ProjectTable({
       ccMitigation: row.ccMitigation,
       ccCode: row.ccCode,
     }));
-    downloadAIP(rows, `AIP_${aipYear === "All" ? "all-years" : aipYear}.xlsx`);
+    downloadAIP(rows, `AIP_${aipYear === "All" ? "all-years" : aipYear}.xlsx`, {
+      fallbackToCsv: true,
+    });
   };
 
   const exportMonitoringCsv = (): void => {
@@ -983,13 +1165,15 @@ export default function ProjectTable({
     const lines = [headers.join(",")];
     for (const row of filteredMonitoring) {
       const cells = headers.map((header) => {
-        const raw = String(row[header] ?? "").replaceAll("\"", "\"\"");
+        const raw = String(row[header] ?? "").replaceAll('"', '""');
         return `\"${raw}\"`;
       });
       lines.push(cells.join(","));
     }
 
-    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob([lines.join("\n")], {
+      type: "text/csv;charset=utf-8",
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -1010,7 +1194,9 @@ export default function ProjectTable({
             <h1 className="text-xl font-bold text-gray-900">
               {mode === "aip" ? "Annual Investment Plan" : "Project Monitoring"}
             </h1>
-            <p className="text-sm text-gray-500">Data source: db.json via services</p>
+            <p className="text-sm text-gray-500">
+              Data source: db.json via services
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -1043,14 +1229,14 @@ export default function ProjectTable({
               <>
                 <button
                   onClick={() => {
-                    if (showHistory && historyPanelView === "all") {
+                    if (showHistory) {
                       setShowHistory(false);
                       return;
                     }
-                    openHistoryPanel("all");
+                    openHistoryPanel();
                   }}
                   className={`px-3 py-1.5 rounded-lg text-sm font-semibold border flex gap-2 justify-center items-center hover:bg-amber-100 hover:cursor-pointer duration-200 ease-in-out ${
-                    showHistory && historyPanelView === "all"
+                    showHistory
                       ? "bg-amber-600 text-white border-amber-600 hover:bg-amber-400"
                       : "bg-white text-amber-700 border-amber-200"
                   }`}
@@ -1058,25 +1244,6 @@ export default function ProjectTable({
                   <IconHistory size={16} />
                   History ({history.length})
                 </button>
-                {mode === "aip" && (
-                  <button
-                    onClick={() => {
-                      if (showHistory && historyPanelView === "lead") {
-                        setShowHistory(false);
-                        return;
-                      }
-                      openHistoryPanel("lead");
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-semibold border flex gap-2 justify-center items-center hover:bg-sky-100 hover:cursor-pointer duration-200 ease-in-out ${
-                      showHistory && historyPanelView === "lead"
-                        ? "bg-sky-600 text-white border-sky-600 hover:bg-sky-500"
-                        : "bg-white text-sky-700 border-sky-200"
-                    }`}
-                  >
-                    <IconHistory size={16} />
-                    Lead Edit History ({leadChangeLog.length})
-                  </button>
-                )}
               </>
             )}
           </div>
@@ -1094,21 +1261,27 @@ export default function ProjectTable({
             className={`bg-white border fixed ${showHistory ? "right-0" : "-right-100"} duration-200 ease-in-out top-25 border-gray-200 rounded-2xl shadow-sm overflow-hidden h-full z-1`}
           >
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-gray-900">{activeHistoryTitle}</h2>
+              <h2 className="text-sm font-bold text-gray-900">
+                {activeHistoryTitle}
+              </h2>
               <span className="text-xs text-gray-500">
                 {activeHistoryFeed.length} changes
               </span>
             </div>
             <div className="max-h-full overflow-y-auto divide-y divide-gray-100">
               {activeHistoryFeed.length === 0 ? (
-                <div className="px-4 py-6 text-sm text-gray-400">No history yet.</div>
+                <div className="px-4 py-6 text-sm text-gray-400">
+                  No history yet.
+                </div>
               ) : (
                 activeHistoryFeed.map((entry) => (
                   <div key={entry.id} className="px-4 py-3 text-sm">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold text-gray-800">
-                        {entry.entity_name === "aip_rows" ? "AIP" : "Monitoring"} ·{" "}
-                        {entry.action_type.toUpperCase()}
+                        {entry.entity_name === "aip_rows"
+                          ? "AIP"
+                          : "Monitoring"}{" "}
+                        · {entry.action_type.toUpperCase()}
                       </span>
                       <span className="text-xs text-gray-500">
                         {new Date(entry.edited_at).toLocaleString()}
@@ -1119,11 +1292,15 @@ export default function ProjectTable({
                     </div>
                     <div className="mt-1 text-xs flex items-center gap-1.5 flex-wrap">
                       <span className="px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-100">
-                        {entry.old_value === null ? "—" : String(entry.old_value)}
+                        {entry.old_value === null
+                          ? "—"
+                          : String(entry.old_value)}
                       </span>
                       <span className="text-gray-400">to</span>
                       <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
-                        {entry.new_value === null ? "—" : String(entry.new_value)}
+                        {entry.new_value === null
+                          ? "—"
+                          : String(entry.new_value)}
                       </span>
                     </div>
                     <div className="mt-2 flex items-center gap-3 text-xs font-semibold">
@@ -1138,16 +1315,16 @@ export default function ProjectTable({
                       {entry.action_type === "edit" ||
                       entry.action_type === "add" ||
                       entry.action_type === "delete" ? (
-                      <button
-                        onClick={() => {
-                          void restoreHistory(entry);
-                        }}
-                        disabled={busy}
-                        className="text-amber-700 hover:underline disabled:opacity-50"
-                      >
-                        Restore
-                      </button>
-                    ) : null}
+                        <button
+                          onClick={() => {
+                            void restoreHistory(entry);
+                          }}
+                          disabled={busy}
+                          className="text-amber-700 hover:underline disabled:opacity-50"
+                        >
+                          Restore
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 ))
@@ -1167,7 +1344,7 @@ export default function ProjectTable({
                     </h2>
                     <p className="text-xs text-gray-500">
                       {isLead
-                        ? "Uploaded rows are editable live, and every lead edit is logged."
+                        ? "Upload, edit, then submit to finalize."
                         : "Review files submitted by leads and their row totals."}
                     </p>
                   </div>
@@ -1187,24 +1364,195 @@ export default function ProjectTable({
                   )}
                 </div>
 
-                <div className="mt-3">
-                  <p className="text-xs font-semibold text-gray-700 mb-2">Uploaded files</p>
+                <div className="mt-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-700">
+                      Uploaded files
+                    </p>
+                    {selectedUpload ? (
+                      <span className="text-[11px] font-semibold text-sky-700 bg-sky-50 border border-sky-100 px-2 py-1 rounded-lg flex items-center gap-2">
+                        Viewing: {selectedUpload.file_name}
+                        {selectedUpload.lead_username
+                          ? ` · ${selectedUpload.lead_username}`
+                          : ""}
+                        {selectedUpload.is_submitted ||
+                        selectedUpload.submitted_at
+                          ? " · Submitted"
+                          : " · Draft"}
+                        <button
+                          type="button"
+                          className="text-[10px] font-semibold text-sky-700 underline"
+                          onClick={clearLeadUploadFilter}
+                        >
+                          Clear
+                        </button>
+                      </span>
+                    ) : null}
+                  </div>
                   {leadFiles.length === 0 ? (
                     <p className="text-xs text-gray-400">No uploads yet.</p>
+                  ) : isAdmin ? (
+                    <div className="space-y-3">
+                      {Object.entries(leadFilesByDepartment).map(
+                        ([department, leads]) => (
+                          <div
+                            key={department}
+                            className="rounded-xl border border-gray-100 bg-gray-50 p-3"
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-semibold text-gray-700">
+                                {department}
+                              </span>
+                              <span className="text-[11px] text-gray-500">
+                                {Object.keys(leads).length} lead
+                                {Object.keys(leads).length > 1 ? "s" : ""}
+                              </span>
+                            </div>
+                            <div className="space-y-2">
+                              {Object.entries(leads).map(([leadId, files]) => (
+                                <details
+                                  key={leadId}
+                                  className="rounded-lg border border-gray-100 bg-white"
+                                >
+                                  <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-gray-700 flex items-center justify-between">
+                                    <span>
+                                      {files[0]?.lead_username ||
+                                        `Lead #${leadId}`}
+                                    </span>
+                                    <span className="text-[11px] text-gray-500">
+                                      {files.length} file
+                                      {files.length > 1 ? "s" : ""}
+                                    </span>
+                                  </summary>
+                                  <div className="px-3 pb-2 space-y-2">
+                                    {files.map((file) => (
+                                      <div
+                                        key={file.id}
+                                        className={`px-2 py-2 text-xs rounded border flex items-center justify-between gap-2 ${
+                                          selectedUploadId === file.id
+                                            ? "border-sky-200 bg-sky-50"
+                                            : "border-gray-100 bg-gray-50"
+                                        }`}
+                                      >
+                                        <div className="min-w-0">
+                                          <div className="font-semibold text-gray-700 truncate">
+                                            {file.file_name}
+                                          </div>
+                                          <div className="text-[11px] text-gray-500">
+                                            {file.row_count} rows ·{" "}
+                                            {new Date(
+                                              file.uploaded_at,
+                                            ).toLocaleString()}
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                          <button
+                                            type="button"
+                                            className="px-2 py-1 rounded bg-white border border-gray-200 text-[11px] font-semibold text-sky-700 hover:bg-sky-50"
+                                            onClick={() =>
+                                              selectLeadUpload(file)
+                                            }
+                                          >
+                                            View Table
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="px-2 py-1 rounded bg-white border border-gray-200 text-[11px] font-semibold text-amber-700 hover:bg-amber-50"
+                                            onClick={() =>
+                                              openFileComments(file)
+                                            }
+                                          >
+                                            Comments
+                                            {fileCommentCountsByFileId[file.id]
+                                              ? ` (${fileCommentCountsByFileId[file.id]})`
+                                              : ""}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </details>
+                              ))}
+                            </div>
+                          </div>
+                        ),
+                      )}
+                    </div>
                   ) : (
-                    <div className="space-y-1">
+                    <div className="space-y-2">
                       {leadFiles.map((file) => (
                         <div
                           key={file.id}
-                          className="px-2 py-1.5 text-xs rounded border border-gray-100 bg-gray-50 flex items-center justify-between"
+                          className={`px-2 py-2 text-xs rounded border flex items-center justify-between gap-2 ${
+                            selectedUploadId === file.id
+                              ? "border-sky-200 bg-sky-50"
+                              : "border-gray-100 bg-gray-50"
+                          }`}
                         >
-                          <span className="font-medium text-gray-700">
-                            {file.file_name}
-                            {isAdmin ? ` (Lead #${file.lead_id})` : ""}
-                          </span>
-                          <span className="text-gray-500">
-                            {file.row_count} rows · {new Date(file.uploaded_at).toLocaleString()}
-                          </span>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-gray-700 truncate">
+                              {file.file_name}
+                            </div>
+                            <div className="text-[11px] text-gray-500">
+                              {file.row_count} rows ·{" "}
+                              {new Date(file.uploaded_at).toLocaleString()} ·{" "}
+                              <span
+                                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                                  file.is_submitted || file.submitted_at
+                                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                    : "border-amber-200 bg-amber-50 text-amber-700"
+                                }`}
+                              >
+                                {file.is_submitted || file.submitted_at
+                                  ? "Submitted"
+                                  : "Draft"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {!(file.is_submitted || file.submitted_at) ? (
+                              <button
+                                type="button"
+                                className="px-2 py-1 rounded bg-white border border-emerald-200 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                                onClick={() => {
+                                  void handleSubmitLeadFile(file.id);
+                                }}
+                                disabled={busy}
+                              >
+                                Submit
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              className="px-2 py-1 rounded bg-white border border-gray-200 text-[11px] font-semibold text-sky-700 hover:bg-sky-50"
+                              onClick={() => selectLeadUpload(file)}
+                            >
+                              View Table
+                            </button>
+                            <button
+                              type="button"
+                              className="px-2 py-1 rounded bg-white border border-gray-200 text-[11px] font-semibold text-amber-700 hover:bg-amber-50"
+                              onClick={() => openFileComments(file)}
+                            >
+                              Comments
+                              {fileCommentCountsByFileId[file.id]
+                                ? ` (${fileCommentCountsByFileId[file.id]})`
+                                : ""}
+                            </button>
+                            <button
+                              type="button"
+                              className="px-2 py-1 rounded bg-white border border-red-200 text-[11px] font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                              onClick={() => {
+                                void handleDeleteLeadFile(file.id);
+                              }}
+                              disabled={
+                                busy ||
+                                Boolean(file.is_submitted || file.submitted_at)
+                              }
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1232,8 +1580,20 @@ export default function ProjectTable({
                 ))}
               </select>
               <span className="px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-xs font-semibold">
-                Comments: {comments.length}
+                Comments: {scopedComments.length}
               </span>
+              {selectedUpload ? (
+                <span className="px-3 py-2 rounded-xl border border-sky-200 bg-sky-50 text-sky-700 text-xs font-semibold flex items-center gap-2">
+                  {selectedUpload.file_name}
+                  <button
+                    type="button"
+                    onClick={clearLeadUploadFilter}
+                    className="text-[10px] underline"
+                  >
+                    Clear
+                  </button>
+                </span>
+              ) : null}
               <button
                 onClick={exportAip}
                 className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold"
@@ -1287,7 +1647,7 @@ export default function ProjectTable({
               departmentOptions={allDepartments}
               onSectorFilterChange={setAipSector}
               onDepartmentFilterChange={setAipDepartment}
-              cellStatuses={leadCellStatuses}
+              cellStatuses={isAdmin ? {} : leadCellStatuses}
               commentCountsByCell={commentCountsByCell}
               commentCountsByRow={commentCountsByRow}
               onOpenComments={(rowId, field) => openComments(rowId, field)}
@@ -1315,7 +1675,7 @@ export default function ProjectTable({
                 ))}
               </select>
               <span className="px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-xs font-semibold">
-                Comments: {comments.length}
+                Comments: {scopedComments.length}
               </span>
               <button
                 onClick={exportMonitoringCsv}
@@ -1393,7 +1753,9 @@ export default function ProjectTable({
 
             <div className="px-5 py-4 space-y-3">
               <div className="flex items-center gap-2">
-                <label className="text-xs font-semibold text-gray-600 uppercase">Target</label>
+                <label className="text-xs font-semibold text-gray-600 uppercase">
+                  Target
+                </label>
                 <select
                   value={commentTarget.field}
                   onChange={(e) =>
@@ -1413,10 +1775,15 @@ export default function ProjectTable({
 
               <div className="max-h-64 overflow-auto border border-gray-100 rounded-xl">
                 {commentThread.length === 0 ? (
-                  <p className="px-4 py-6 text-sm text-gray-400">No comments for this target yet.</p>
+                  <p className="px-4 py-6 text-sm text-gray-400">
+                    No comments for this target yet.
+                  </p>
                 ) : (
                   commentThread.map((comment) => (
-                    <div key={comment.id} className="px-4 py-3 border-b border-gray-100">
+                    <div
+                      key={comment.id}
+                      className="px-4 py-3 border-b border-gray-100"
+                    >
                       <div className="flex items-start gap-2">
                         {comment.created_by_avatar ? (
                           <img
@@ -1435,8 +1802,8 @@ export default function ProjectTable({
                         )}
                         <div className="min-w-0">
                           <p className="text-xs text-gray-500">
-                            {comment.created_by_name} ({comment.created_by_role}) ·{" "}
-                            {new Date(comment.created_at).toLocaleString()}
+                            {comment.created_by_name} ({comment.created_by_role}
+                            ) · {new Date(comment.created_at).toLocaleString()}
                           </p>
                           <p className="text-sm text-gray-800 whitespace-pre-wrap">
                             {comment.comment_text}
@@ -1472,6 +1839,109 @@ export default function ProjectTable({
               ) : (
                 <p className="text-xs text-gray-500">
                   Comments are admin-only. You can view existing comments here.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {fileCommentTarget && (
+        <div
+          className="fixed inset-0 bg-black/30 z-30 flex items-center justify-center p-4"
+          onClick={closeFileComments}
+        >
+          <div
+            className="w-full max-w-xl bg-white rounded-2xl border border-gray-200 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">
+                  File Comments
+                </h3>
+                <p className="text-xs text-gray-500">
+                  {fileCommentTarget.file_name}
+                </p>
+              </div>
+              <button
+                onClick={closeFileComments}
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="px-5 py-4 space-y-3">
+              <div className="max-h-64 overflow-auto border border-gray-100 rounded-xl">
+                {fileCommentThread.length === 0 ? (
+                  <p className="px-4 py-6 text-sm text-gray-400">
+                    No comments for this file yet.
+                  </p>
+                ) : (
+                  fileCommentThread.map((comment) => (
+                    <div
+                      key={comment.id}
+                      className="px-4 py-3 border-b border-gray-100"
+                    >
+                      <div className="flex items-start gap-2">
+                        {comment.created_by_avatar ? (
+                          <img
+                            src={comment.created_by_avatar}
+                            alt={comment.created_by_name}
+                            className="w-7 h-7 rounded-full object-cover"
+                            title={`${comment.created_by_name} (${comment.created_by_role})`}
+                          />
+                        ) : (
+                          <div
+                            className="w-7 h-7 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold flex items-center justify-center"
+                            title={`${comment.created_by_name} (${comment.created_by_role})`}
+                          >
+                            {makeInitials(comment.created_by_name)}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-xs text-gray-500">
+                            {comment.created_by_name} ({comment.created_by_role}
+                            ) · {new Date(comment.created_at).toLocaleString()}
+                          </p>
+                          <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                            {comment.comment_text}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {isAdmin ? (
+                <>
+                  <textarea
+                    value={fileCommentDraft}
+                    onChange={(e) => setFileCommentDraft(e.target.value)}
+                    rows={3}
+                    placeholder="Add a file comment..."
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => {
+                        void submitFileComment();
+                      }}
+                      disabled={
+                        fileCommentSubmitting || !fileCommentDraft.trim()
+                      }
+                      className="px-3 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold disabled:opacity-50"
+                    >
+                      {fileCommentSubmitting ? "Saving..." : "Add Comment"}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-gray-500">
+                  File comments are admin-only. You can view existing comments
+                  here.
                 </p>
               )}
             </div>

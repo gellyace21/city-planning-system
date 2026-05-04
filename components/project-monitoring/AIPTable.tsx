@@ -14,11 +14,11 @@ import SectorBadge from "./SectorBadge";
 import { IconMessageCircle } from "@tabler/icons-react";
 
 const INITIAL_COLUMN_WIDTHS = [
-  44, 110, 320, 130, 160, 150, 220, 130, 90, 90, 90, 90, 100, 120, 120, 90,
-  44,
+  52, 140, 380, 150, 190, 170, 260, 150, 110, 110, 110, 110, 120, 140, 140, 110,
+  52,
 ];
 
-const MIN_COLUMN_WIDTH = 72;
+const MIN_COLUMN_WIDTH = 90;
 
 const MIN_COLUMN_WIDTH_BY_INDEX: Record<number, number> = {
   0: 40,
@@ -187,15 +187,15 @@ export default function AIPTable({
   }> = ({ label, filterKey, options, value, onChange, colIndex }) => {
     const isOpen = openFilter === filterKey;
     return (
-      <th
-        className="px-1.5 py-2 text-left text-[10px] font-bold uppercase tracking-tight select-none whitespace-normal wrap-break-word transition-colors relative"
-      >
+      <th className="px-1.5 py-2 text-left text-[11px] font-bold uppercase tracking-tight select-none whitespace-normal wrap-break-word transition-colors relative">
         <button
           type="button"
           className="flex items-center gap-1 cursor-pointer hover:bg-sky-50 rounded px-0.5"
           onClick={(event) => {
             event.stopPropagation();
-            setOpenFilter((current) => (current === filterKey ? null : filterKey));
+            setOpenFilter((current) =>
+              current === filterKey ? null : filterKey,
+            );
           }}
         >
           <span>{label}</span>
@@ -291,7 +291,7 @@ export default function AIPTable({
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={commitEdit}
             onKeyDown={handleKeyDown}
-            className="w-full min-w-0 text-[11px] border border-sky-400 rounded px-1 py-0.5 bg-sky-50 focus:outline-none focus:ring-1 focus:ring-sky-500"
+            className="w-full min-w-0 text-[12px] border border-sky-400 rounded px-1 py-0.5 bg-sky-50 focus:outline-none focus:ring-1 focus:ring-sky-500"
           />
           {commentCount > 0 && (
             <button
@@ -372,7 +372,7 @@ export default function AIPTable({
     cls?: string;
   }): React.JSX.Element => (
     <th
-      className={`px-1.5 py-2 text-left text-[10px] font-bold uppercase tracking-tight select-none whitespace-normal wrap-break-word transition-colors ${col ? "cursor-pointer hover:bg-sky-50" : ""} ${cls}`}
+      className={`px-1.5 py-2 text-left text-[11px] font-bold uppercase tracking-tight select-none whitespace-normal wrap-break-word transition-colors ${col ? "cursor-pointer hover:bg-sky-50" : ""} ${cls}`}
       onClick={() => col && handleSort(col)}
     >
       {label}
@@ -397,9 +397,12 @@ export default function AIPTable({
   const totalBudget = filtered.reduce((s, r) => s + r.total, 0);
 
   return (
-    <div ref={tableWrapRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <div
+      ref={tableWrapRef}
+      className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
+    >
       <div className="overflow-x-auto">
-        <table className="min-w-full w-max table-fixed text-[11px] border-collapse [&_th]:align-top [&_td]:align-top [&_td]:wrap-break-word [&_td]:whitespace-normal">
+        <table className="min-w-full w-max table-fixed text-[12px] border-collapse [&_th]:align-top [&_td]:align-top [&_td]:wrap-break-word [&_td]:whitespace-normal">
           <colgroup>
             {columnWidths.map((width, index) => (
               <col key={`aip-col-${index}`} style={{ width: `${width}px` }} />
@@ -465,14 +468,14 @@ export default function AIPTable({
                 cls: "relative",
               })}
               <th
-                className="px-1 py-2 text-center text-[10px] font-bold uppercase tracking-tight bg-sky-50 text-sky-700 border-l border-sky-100 relative"
+                className="px-1 py-2 text-center text-[11px] font-bold uppercase tracking-tight bg-sky-50 text-sky-700 border-l border-sky-100 relative"
                 colSpan={5}
               >
                 Amount (₱ Thousands)
                 <HeaderResizeHandle colIndex={12} />
               </th>
               <th
-                className="px-1 py-2 text-center text-[10px] font-bold uppercase tracking-tight bg-emerald-50 text-emerald-700 border-l border-emerald-100 relative"
+                className="px-1 py-2 text-center text-[11px] font-bold uppercase tracking-tight bg-emerald-50 text-emerald-700 border-l border-emerald-100 relative"
                 colSpan={3}
               >
                 Climate Change Expenditure
@@ -487,7 +490,7 @@ export default function AIPTable({
               {amountCols.map(([col, label], idx) => (
                 <th
                   key={col as string}
-                  className={`px-1 py-2 text-right text-[10px] font-semibold cursor-pointer hover:bg-sky-100 transition border-l border-sky-100 relative ${col === "total" ? "text-sky-700 font-bold" : ""}`}
+                  className={`px-1 py-2 text-right text-[11px] font-semibold cursor-pointer hover:bg-sky-100 transition border-l border-sky-100 relative ${col === "total" ? "text-sky-700 font-bold" : ""}`}
                   onClick={() => handleSort(col)}
                 >
                   {label}
@@ -498,7 +501,7 @@ export default function AIPTable({
               {ccCols.map(([col, label], idx) => (
                 <th
                   key={col as string}
-                  className="px-1 py-2 text-right text-[10px] font-semibold cursor-pointer hover:bg-emerald-100 transition border-l border-emerald-100 relative"
+                  className="px-1 py-2 text-right text-[11px] font-semibold cursor-pointer hover:bg-emerald-100 transition border-l border-emerald-100 relative"
                   onClick={() => handleSort(col)}
                 >
                   {label}
@@ -615,12 +618,12 @@ export default function AIPTable({
                   <EditableCell
                     row={row}
                     field="department"
-                    className="px-1.5 py-1.5 text-gray-600 text-[11px]"
+                    className="px-1.5 py-1.5 text-gray-600 text-[12px]"
                   />
 
                   {/* Schedule */}
                   <td
-                    className={`px-1.5 py-1.5 text-[11px] text-gray-500 relative ${scheduleCommentClass}`}
+                    className={`px-1.5 py-1.5 text-[12px] text-gray-500 relative ${scheduleCommentClass}`}
                   >
                     <div className="flex flex-col gap-0.5">
                       {editCell?.rowId === row.id &&
@@ -706,12 +709,12 @@ export default function AIPTable({
                   <EditableCell
                     row={row}
                     field="outputs"
-                    className="px-1.5 py-1.5 text-[11px] text-gray-600"
+                    className="px-1.5 py-1.5 text-[12px] text-gray-600"
                   />
 
                   {/* Funding */}
                   <td
-                    className={`px-1.5 py-1.5 text-[11px] relative ${fundingCommentClass}`}
+                    className={`px-1.5 py-1.5 text-[12px] relative ${fundingCommentClass}`}
                     onDoubleClick={() =>
                       startEdit(row.id, "funding", row.funding)
                     }
@@ -757,7 +760,7 @@ export default function AIPTable({
                       key={k as string}
                       row={row}
                       field={k}
-                      className="px-1.5 py-1.5 text-right text-[11px] text-gray-600 border-l border-sky-50 tabular-nums"
+                      className="px-1.5 py-1.5 text-right text-[12px] text-gray-600 border-l border-sky-50 tabular-nums"
                       numeric
                     />
                   ))}
@@ -767,26 +770,26 @@ export default function AIPTable({
                     row={row}
                     field="total"
                     readOnly
-                    className="px-1.5 py-1.5 text-right text-[11px] border-l border-sky-100 tabular-nums bg-sky-50/40"
+                    className="px-1.5 py-1.5 text-right text-[12px] border-l border-sky-100 tabular-nums bg-sky-50/40"
                   />
 
                   {/* CC fields */}
                   <EditableCell
                     row={row}
                     field="ccAdaptation"
-                    className="px-1.5 py-1.5 text-right text-[11px] text-emerald-700 border-l border-emerald-100 tabular-nums"
+                    className="px-1.5 py-1.5 text-right text-[12px] text-emerald-700 border-l border-emerald-100 tabular-nums"
                     numeric
                   />
                   <EditableCell
                     row={row}
                     field="ccMitigation"
-                    className="px-1.5 py-1.5 text-right text-[11px] text-emerald-700 tabular-nums"
+                    className="px-1.5 py-1.5 text-right text-[12px] text-emerald-700 tabular-nums"
                     numeric
                   />
                   <EditableCell
                     row={row}
                     field="ccCode"
-                    className="px-1.5 py-1.5 text-center text-[11px]"
+                    className="px-1.5 py-1.5 text-center text-[12px]"
                   />
                   <td className="relative w-0 overflow-visible group border-0 bg-transparent px-0 py-1.5">
                     <button

@@ -17,6 +17,7 @@ interface DbShape {
   monitoring_rows?: RawMonitoringRow[];
   edit_history?: RawEditHistoryEntry[];
   lead_files?: RawLeadFile[];
+  file_comments?: RawFileCommentEntry[];
   comments?: RawCommentEntry[];
   notifications?: RawNotificationEntry[];
   admins?: RawAdminUser[];
@@ -69,6 +70,22 @@ export interface LeadFileSummary {
   file_name: string;
   uploaded_at: string;
   row_count: number;
+  department?: string;
+  lead_username?: string;
+  is_submitted: boolean;
+  submitted_at?: string | null;
+}
+
+export interface FileCommentEntry {
+  id: number;
+  file_id: number;
+  lead_id: number;
+  comment_text: string;
+  created_by_id: number;
+  created_by_role: "admin" | "superadmin" | "lead";
+  created_by_name: string;
+  created_by_avatar?: string;
+  created_at: string;
 }
 
 interface RawAIPRow extends AIPRow {
@@ -110,7 +127,10 @@ interface RawLeadFile {
   lead_id: number;
   file_name: string;
   uploaded_at: string;
+  submitted_at?: string | null;
   row_count: number;
+  department?: string;
+  is_submitted?: boolean;
 }
 
 interface RawCommentEntry {
@@ -119,6 +139,18 @@ interface RawCommentEntry {
   entity_name: "aip_rows" | "monitoring_rows";
   row_id: number;
   column_name: string;
+  comment_text: string;
+  created_by_id: number;
+  created_by_role: "admin" | "superadmin" | "lead";
+  created_by_name: string;
+  created_by_avatar?: string;
+  created_at: string;
+}
+
+interface RawFileCommentEntry {
+  id: number;
+  file_id: number;
+  lead_id: number;
   comment_text: string;
   created_by_id: number;
   created_by_role: "admin" | "superadmin" | "lead";
@@ -255,7 +287,13 @@ const toLeadFileSummary = (raw: RawLeadFile): LeadFileSummary => ({
   lead_id: toNumber(raw.lead_id),
   file_name: toStringSafe(raw.file_name),
   uploaded_at: toStringSafe(raw.uploaded_at),
+  submitted_at:
+    raw.submitted_at === null
+      ? null
+      : toStringSafe(raw.submitted_at ?? raw.uploaded_at),
   row_count: toNumber(raw.row_count),
+  department: toStringSafe(raw.department) || undefined,
+  is_submitted: raw.is_submitted ?? true,
 });
 
 const toCommentEntry = (raw: RawCommentEntry): CommentEntry => ({
@@ -273,9 +311,19 @@ const toCommentEntry = (raw: RawCommentEntry): CommentEntry => ({
   created_at: toStringSafe(raw.created_at),
 });
 
-const toNotificationEntry = (
-  raw: RawNotificationEntry,
-): NotificationEntry => ({
+const toFileCommentEntry = (raw: RawFileCommentEntry): FileCommentEntry => ({
+  id: toNumber(raw.id),
+  file_id: toNumber(raw.file_id),
+  lead_id: toNumber(raw.lead_id),
+  comment_text: toStringSafe(raw.comment_text),
+  created_by_id: toNumber(raw.created_by_id),
+  created_by_role: raw.created_by_role ?? "admin",
+  created_by_name: toStringSafe(raw.created_by_name) || "Unknown",
+  created_by_avatar: toStringSafe(raw.created_by_avatar) || undefined,
+  created_at: toStringSafe(raw.created_at),
+});
+
+const toNotificationEntry = (raw: RawNotificationEntry): NotificationEntry => ({
   id: toNumber(raw.id),
   recipient_id: toNumber(raw.recipient_id),
   recipient_role: raw.recipient_role ?? "admin",
@@ -373,6 +421,10 @@ const getLeadFiles = (db: DbShape): RawLeadFile[] => {
 
 const getComments = (db: DbShape): RawCommentEntry[] => {
   return (db.comments ?? []) as RawCommentEntry[];
+};
+
+const getFileComments = (db: DbShape): RawFileCommentEntry[] => {
+  return (db.file_comments ?? []) as RawFileCommentEntry[];
 };
 
 const getNotifications = (db: DbShape): RawNotificationEntry[] => {
@@ -610,7 +662,7 @@ const undoMonitoringEntry = (db: DbShape, entry: EditHistoryEntry): void => {
   db.monitoring_rows = rows;
 };
 
-export async function getProjectMonitoringData(): Promise<{
+export async function getProjectMonitoringData(actor?: ActorContext): Promise<{
   aipRows: AIPRow[];
   monitoringRows: MonitoringRow[];
   history: EditHistoryEntry[];
@@ -623,22 +675,46 @@ export async function getProjectMonitoringData(): Promise<{
   const history = (db.edit_history ?? [])
     .map(toEditHistory)
     .sort((a, b) => b.edited_at.localeCompare(a.edited_at));
+
+  if (actor && isAdminRole(actor.role)) {
+    const submittedLeadUploads = new Set(
+      getLeadFiles(db)
+        .filter((file) => file.is_submitted || file.submitted_at)
+        .map((file) => toNumber(file.id)),
+    );
+
+    const filteredAipRows = aipRows.filter((row) => {
+      if (!row.lead_id) return true;
+      return submittedLeadUploads.has(toNumber(row.upload_id));
+    });
+
+    const filteredHistory = history.filter(
+      (entry) => entry.edited_by_role !== "lead",
+    );
+
+    return {
+      aipRows: filteredAipRows,
+      monitoringRows,
+      history: filteredHistory,
+    };
+  }
+
   return { aipRows, monitoringRows, history };
 }
 
-export async function getAipPageData(): Promise<{
+export async function getAipPageData(actor?: ActorContext): Promise<{
   aipRows: AIPRow[];
   history: EditHistoryEntry[];
 }> {
-  const { aipRows, history } = await getProjectMonitoringData();
+  const { aipRows, history } = await getProjectMonitoringData(actor);
   return { aipRows, history };
 }
 
-export async function getMonitoringPageData(): Promise<{
+export async function getMonitoringPageData(actor?: ActorContext): Promise<{
   monitoringRows: MonitoringRow[];
   history: EditHistoryEntry[];
 }> {
-  const { monitoringRows, history } = await getProjectMonitoringData();
+  const { monitoringRows, history } = await getProjectMonitoringData(actor);
   return { monitoringRows, history };
 }
 
@@ -770,6 +846,13 @@ export async function updateAipRowField(
     throw new Error("Leads can only edit their own uploaded rows.");
   }
 
+  const leadFile = getLeadFiles(db).find((entry) => entry.id === row.upload_id);
+  if (leadFile && (leadFile.is_submitted || leadFile.submitted_at)) {
+    throw new Error(
+      "This file has been submitted and can no longer be edited.",
+    );
+  }
+
   row[field] = parsed as never;
 
   if (field === "ps" || field === "mooe" || field === "fe" || field === "co") {
@@ -796,12 +879,6 @@ export async function updateAipRowField(
   });
 
   db.aip_rows = rows;
-  notifyRelevantUsers(db, actor, {
-    entity_name: "aip_rows",
-    row_id: row.id,
-    column_name: String(field),
-    message: `AIP field ${String(field)} was updated by lead.`,
-  });
   await writeDb(db);
   return { row: toAipRow(row), historyEntry };
 }
@@ -1024,13 +1101,18 @@ export async function uploadLeadAipRows(
   const db = await readDb();
   const leadFiles = getLeadFiles(db);
   const aipRows = getAipRows(db);
+  const lead = getLeads(db).find((item) => toNumber(item.id) === actor.id);
+  const leadDepartment = toStringSafe(lead?.department) || "General";
 
   const fileRecord: RawLeadFile = {
     id: nextId(leadFiles),
     lead_id: actor.id,
     file_name: fileName || `lead-upload-${Date.now()}.xlsx`,
     uploaded_at: new Date().toISOString(),
+    submitted_at: null,
     row_count: cleanedRows.length,
+    department: leadDepartment,
+    is_submitted: false,
   };
   leadFiles.push(fileRecord);
 
@@ -1070,12 +1152,6 @@ export async function uploadLeadAipRows(
 
   db.lead_files = leadFiles;
   db.aip_rows = [...aipRows, ...createdRows];
-  notifyRelevantUsers(db, actor, {
-    entity_name: "aip_rows",
-    row_id: createdRows[0]?.id ?? 0,
-    column_name: "__row__",
-    message: `Lead submitted ${cleanedRows.length} AIP row(s).`,
-  });
   await writeDb(db);
 
   return {
@@ -1084,19 +1160,124 @@ export async function uploadLeadAipRows(
   };
 }
 
+export async function submitLeadAipFile(
+  actor: ActorContext,
+  fileId: number,
+): Promise<LeadFileSummary> {
+  if (actor.role !== "lead") {
+    throw new Error("Only leads can submit AIP files.");
+  }
+
+  const db = await readDb();
+  const leadFiles = getLeadFiles(db);
+  const idx = leadFiles.findIndex((entry) => entry.id === fileId);
+  if (idx < 0) {
+    throw new Error("Lead file not found.");
+  }
+
+  const file = leadFiles[idx];
+  if (file.lead_id !== actor.id) {
+    throw new Error("Leads can only submit their own uploads.");
+  }
+
+  if (file.submitted_at === null) {
+    leadFiles[idx] = {
+      ...file,
+      submitted_at: new Date().toISOString(),
+    };
+    db.lead_files = leadFiles;
+
+    const firstRow = getAipRows(db).find((row) => row.upload_id === fileId);
+
+    notifyRelevantUsers(db, actor, {
+      entity_name: "aip_rows",
+      row_id: firstRow?.id ?? 0,
+      column_name: "__row__",
+      message: `Lead submitted ${file.row_count} AIP row(s).`,
+    });
+
+    await writeDb(db);
+    return toLeadFileSummary(leadFiles[idx]);
+  }
+
+  return toLeadFileSummary(file);
+}
+
 export async function getLeadUploadedFiles(
   actor: ActorContext,
 ): Promise<LeadFileSummary[]> {
   const db = await readDb();
-  const allFiles = getLeadFiles(db).map(toLeadFileSummary);
+  const leads = getLeads(db);
+  const leadById = new Map(leads.map((lead) => [toNumber(lead.id), lead]));
+  const allFiles = getLeadFiles(db)
+    .map(toLeadFileSummary)
+    .map((file) => {
+      const lead = leadById.get(file.lead_id);
+      const department =
+        file.department?.trim() || toStringSafe(lead?.department) || "General";
+      return {
+        ...file,
+        department,
+        lead_username: toStringSafe(lead?.username) || `Lead ${file.lead_id}`,
+      };
+    });
 
   if (isAdminRole(actor.role)) {
-    return allFiles.sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at));
+    return allFiles
+      .filter((file) => file.is_submitted || file.submitted_at)
+      .sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at));
   }
 
   return allFiles
     .filter((file) => file.lead_id === actor.id)
     .sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at));
+}
+
+export async function submitLeadUpload(
+  actor: ActorContext,
+  fileId: number,
+): Promise<LeadFileSummary> {
+  if (actor.role !== "lead") {
+    throw new Error("Only leads can submit AIP files.");
+  }
+
+  const db = await readDb();
+  const leadFiles = getLeadFiles(db);
+  const index = leadFiles.findIndex((file) => file.id === fileId);
+  if (index < 0) {
+    throw new Error("Lead file not found.");
+  }
+
+  const file = leadFiles[index];
+  if (file.lead_id !== actor.id) {
+    throw new Error("Leads can only submit their own uploads.");
+  }
+
+  if (file.is_submitted) {
+    return toLeadFileSummary(file);
+  }
+
+  const submittedAt = new Date().toISOString();
+  leadFiles[index] = {
+    ...file,
+    is_submitted: true,
+    submitted_at: submittedAt,
+  };
+  db.lead_files = leadFiles;
+  await writeDb(db);
+
+  const firstRow = getAipRows(db).find((row) => row.upload_id === fileId);
+  if (firstRow) {
+    notifyRelevantUsers(db, actor, {
+      entity_name: "aip_rows",
+      row_id: firstRow.id,
+      column_name: "__row__",
+      message: `Lead submitted AIP file ${file.file_name}.`,
+    });
+    await writeDb(db);
+  }
+
+  return toLeadFileSummary(leadFiles[index]);
 }
 
 export async function reviewAipSuggestion(
@@ -1337,6 +1518,98 @@ export async function addCommentToEntity(
   return toCommentEntry(created);
 }
 
+export async function getLeadFileComments(
+  actor: ActorContext,
+): Promise<FileCommentEntry[]> {
+  const db = await readDb();
+  const comments = getFileComments(db).map(toFileCommentEntry);
+
+  if (isAdminRole(actor.role)) {
+    return comments.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }
+
+  return comments
+    .filter((comment) => comment.lead_id === actor.id)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+export async function addLeadFileComment(
+  actor: ActorContext,
+  payload: {
+    file_id: number;
+    comment_text: string;
+  },
+): Promise<FileCommentEntry> {
+  const text = payload.comment_text.trim();
+  if (!text) {
+    throw new Error("Comment cannot be empty.");
+  }
+
+  if (!isAdminRole(actor.role)) {
+    throw new Error("Only admins can create file comments.");
+  }
+
+  const db = await readDb();
+  const leadFiles = getLeadFiles(db);
+  const file = leadFiles.find((entry) => entry.id === payload.file_id);
+  if (!file) {
+    throw new Error("Lead file not found.");
+  }
+
+  const comments = getFileComments(db);
+  const actorIdentity = getActorIdentity(db, actor);
+  const created: RawFileCommentEntry = {
+    id: nextId(comments),
+    file_id: file.id,
+    lead_id: file.lead_id,
+    comment_text: text,
+    created_by_id: actor.id,
+    created_by_role: actor.role,
+    created_by_name: actorIdentity.name,
+    created_by_avatar: actorIdentity.avatar,
+    created_at: new Date().toISOString(),
+  };
+
+  comments.push(created);
+  db.file_comments = comments;
+  await writeDb(db);
+  return toFileCommentEntry(created);
+}
+
+export async function deleteLeadUploadedFile(
+  actor: ActorContext,
+  fileId: number,
+): Promise<{ deletedFileId: number; removedRowIds: number[] }> {
+  const db = await readDb();
+  const leadFiles = getLeadFiles(db);
+  const file = leadFiles.find((entry) => entry.id === fileId);
+  if (!file) {
+    throw new Error("Lead file not found.");
+  }
+
+  if (!isAdminRole(actor.role) && file.lead_id !== actor.id) {
+    throw new Error("Leads can only delete their own uploads.");
+  }
+
+  if (!isAdminRole(actor.role) && file.submitted_at !== null) {
+    throw new Error("Submitted files can no longer be deleted.");
+  }
+
+  db.lead_files = leadFiles.filter((entry) => entry.id !== fileId);
+  const aipRows = getAipRows(db);
+  const removedRows = aipRows.filter((row) => row.upload_id === fileId);
+  db.aip_rows = aipRows.filter((row) => row.upload_id !== fileId);
+  db.file_comments = getFileComments(db).filter(
+    (comment) => comment.file_id !== fileId,
+  );
+  await writeDb(db);
+
+  return {
+    deletedFileId: fileId,
+    removedRowIds: removedRows.map((row) => row.id),
+  };
+}
+
 export async function getActorNotifications(
   actor: ActorContext,
 ): Promise<NotificationEntry[]> {
@@ -1362,7 +1635,10 @@ export async function markNotificationAsRead(
   }
 
   const target = notifications[idx];
-  if (target.recipient_id !== actor.id || target.recipient_role !== actor.role) {
+  if (
+    target.recipient_id !== actor.id ||
+    target.recipient_role !== actor.role
+  ) {
     throw new Error("Not allowed to update this notification.");
   }
 

@@ -128,61 +128,128 @@ function writeCell(
  */
 export function downloadAIP(
   data: AIPExportRow[],
-  filename = "AIP_FY2027_Export.xlsx",
+  filename = "AIP_CY_2026_Export.xlsx",
+  options: { fallbackToCsv?: boolean } = {},
 ): void {
   void (async () => {
-    // 1. Load the original template from embedded base64
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(toArrayBufferFromBase64(TEMPLATE_BASE64));
-    const ws = workbook.worksheets[0];
-    if (!ws) throw new Error("Template worksheet not found.");
+    try {
+      // 1. Load the original template from embedded base64
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(toArrayBufferFromBase64(TEMPLATE_BASE64));
+      const ws = workbook.worksheets[0];
+      if (!ws) throw new Error("Template worksheet not found.");
 
-    // 2. Clear placeholder template dates
-    const maxTemplateDateRow = DATA_START_ROW + 500;
-    for (let r = DATA_START_ROW; r <= maxTemplateDateRow; r++) {
-      const dCell = ws.getCell(`D${r}`);
-      const eCell = ws.getCell(`E${r}`);
-      const dVal = getCellString(dCell.value);
-      const eVal = getCellString(eCell.value);
-      if (dVal === "Jan. 2027") dCell.value = null;
-      if (eVal === "Dec. 2027") eCell.value = null;
+      // 2. Clear placeholder template dates
+      const maxTemplateDateRow = DATA_START_ROW + 500;
+      for (let r = DATA_START_ROW; r <= maxTemplateDateRow; r++) {
+        const dCell = ws.getCell(`D${r}`);
+        const eCell = ws.getCell(`E${r}`);
+        const dVal = getCellString(dCell.value);
+        const eVal = getCellString(eCell.value);
+        if (dVal === "Jan. 2027") dCell.value = null;
+        if (eVal === "Dec. 2027") eCell.value = null;
+      }
+
+      // 3. Write each data row into the template
+      data.forEach((row, i) => {
+        const { contentRow, dateRow } = getEntryRows(i);
+
+        writeCell(ws, "A", contentRow, row.aipCode || null);
+        writeCell(ws, "B", contentRow, row.description || null);
+        writeCell(ws, "C", contentRow, row.department || null);
+        writeCell(ws, "F", contentRow, row.outputs || null);
+        writeCell(ws, "G", contentRow, row.funding || null);
+
+        writeCell(ws, "H", contentRow, row.ps || null);
+        writeCell(ws, "I", contentRow, row.mooe || null);
+        writeCell(ws, "J", contentRow, row.fe || null);
+        writeCell(ws, "K", contentRow, row.co || null);
+        writeCell(ws, "L", contentRow, row.total || null);
+        writeCell(ws, "M", contentRow, row.ccAdaptation || null);
+        writeCell(ws, "N", contentRow, row.ccMitigation || null);
+        writeCell(ws, "O", contentRow, row.ccCode || null);
+
+        writeCell(ws, "D", dateRow, row.startDate || null);
+        writeCell(ws, "E", dateRow, row.endDate || null);
+      });
+
+      // 4. Download workbook
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      if (options.fallbackToCsv) {
+        downloadAIPCsv(data, "AIP_CY_2026_Export.csv");
+        return;
+      }
+      throw error;
     }
-
-    // 3. Write each data row into the template
-    data.forEach((row, i) => {
-      const { contentRow, dateRow } = getEntryRows(i);
-
-      writeCell(ws, "A", contentRow, row.aipCode || null);
-      writeCell(ws, "B", contentRow, row.description || null);
-      writeCell(ws, "C", contentRow, row.department || null);
-      writeCell(ws, "F", contentRow, row.outputs || null);
-      writeCell(ws, "G", contentRow, row.funding || null);
-
-      writeCell(ws, "H", contentRow, row.ps || null);
-      writeCell(ws, "I", contentRow, row.mooe || null);
-      writeCell(ws, "J", contentRow, row.fe || null);
-      writeCell(ws, "K", contentRow, row.co || null);
-      writeCell(ws, "L", contentRow, row.total || null);
-      writeCell(ws, "M", contentRow, row.ccAdaptation || null);
-      writeCell(ws, "N", contentRow, row.ccMitigation || null);
-      writeCell(ws, "O", contentRow, row.ccCode || null);
-
-      writeCell(ws, "D", dateRow, row.startDate || null);
-      writeCell(ws, "E", dateRow, row.endDate || null);
-    });
-
-    // 4. Download workbook
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
   })();
+}
+
+export function downloadAIPCsv(
+  data: AIPExportRow[],
+  filename = "AIP_CY_2026_Export.csv",
+): void {
+  const headers = [
+    "AIP Code",
+    "Program/Project/Activity",
+    "Department/Office",
+    "Start Date",
+    "End Date",
+    "Expected Outputs",
+    "Funding Source",
+    "PS",
+    "MOOE",
+    "FE",
+    "CO",
+    "Total",
+    "CC Adaptation",
+    "CC Mitigation",
+    "CC Code",
+  ];
+
+  const lines = [headers.join(",")];
+  for (const row of data) {
+    const values = [
+      row.aipCode,
+      row.description,
+      row.department,
+      row.startDate,
+      row.endDate,
+      row.outputs,
+      row.funding,
+      row.ps,
+      row.mooe,
+      row.fe,
+      row.co,
+      row.total,
+      row.ccAdaptation,
+      row.ccMitigation,
+      row.ccCode,
+    ].map((value) => {
+      const raw = value === null || value === undefined ? "" : String(value);
+      return `"${raw.replaceAll('"', '""')}"`;
+    });
+    lines.push(values.join(","));
+  }
+
+  const blob = new Blob([lines.join("\n")], {
+    type: "text/csv;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 // ─── Import parser ────────────────────────────────────────────────────────────

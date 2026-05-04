@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
-import bcrypt from "bcryptjs";
 
 const DB_PATH = path.join(process.cwd(), "db.json");
 
@@ -33,9 +32,21 @@ export async function GET(
       );
     }
 
+    const lead = (db.leads || []).find(
+      (entry: { id: number }) => entry.id === found.lead_id,
+    );
+
+    if (!lead) {
+      return NextResponse.json(
+        { valid: false, error: "Lead account not found" },
+        { status: 404 },
+      );
+    }
+
     return NextResponse.json({
       valid: true,
-      leadUsername: found.lead_username,
+      leadUsername: lead.username || "",
+      needsUsername: !lead.username,
     });
   } catch (error) {
     console.error("Failed to validate token:", error);
@@ -53,14 +64,7 @@ export async function POST(
   try {
     const { token } = await params;
     const body = await request.json();
-    const password = String(body?.password || "");
-
-    if (!password) {
-      return NextResponse.json(
-        { error: "Password is required" },
-        { status: 400 },
-      );
-    }
+    const username = String(body?.username || "").trim();
 
     const db = await readDb();
     const links = db.generated_links || [];
@@ -88,24 +92,31 @@ export async function POST(
       );
     }
 
-    const hasExistingPassword =
-      typeof lead.password_hash === "string" &&
-      lead.password_hash.startsWith("$2");
+    if (!lead.username && !username) {
+      return NextResponse.json(
+        { error: "Lead username is required." },
+        { status: 400 },
+      );
+    }
 
-    if (!hasExistingPassword) {
-      db.leads[leadIndex] = {
-        ...lead,
-        password_hash: await bcrypt.hash(password, 10),
-        is_active: true,
-      };
-    } else {
-      const isMatch = await bcrypt.compare(password, lead.password_hash);
-      if (!isMatch) {
+    if (username && !lead.username) {
+      const existing = (db.leads || []).find(
+        (entry: { username: string; id: number }) =>
+          entry.username?.toLowerCase() === username.toLowerCase() &&
+          entry.id !== lead.id,
+      );
+      if (existing) {
         return NextResponse.json(
-          { error: "Incorrect password" },
-          { status: 401 },
+          { error: "Lead username is already taken." },
+          { status: 409 },
         );
       }
+
+      db.leads[leadIndex] = {
+        ...lead,
+        username,
+        is_active: true,
+      };
     }
 
     db.generated_links[linkIndex] = {
@@ -116,7 +127,7 @@ export async function POST(
 
     return NextResponse.json({
       ok: true,
-      leadUsername: lead.username,
+      leadUsername: db.leads[leadIndex]?.username || lead.username,
     });
   } catch (error) {
     console.error("Failed to access lead link:", error);

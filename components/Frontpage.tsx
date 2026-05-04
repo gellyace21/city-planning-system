@@ -57,13 +57,7 @@ export default function Frontpage(): React.JSX.Element {
           {/* </div> */}
         </section>
 
-        <section className="map-panel">
-          <img
-            src="https://scontent.fmnl45-2.fna.fbcdn.net/v/t1.15752-9/649303634_936146618812411_5783272993715675569_n.png?stp=dst-png_s2048x2048&_nc_cat=107&ccb=1-7&_nc_sid=9f807c&_nc_eui2=AeGL1pGb7oHV4L9yUsQUaRMPBjmZT4KlbD4GOZlPgqVsPhCDUtO8uZ-czIs9Gi-3jlDBBkPxaH6wAc821rvIR9eS&_nc_ohc=fFx7xLJ_SGQQ7kNvwEnDpW1&_nc_oc=AdkqTpVRpTKOl5ZV6z0CF7_gOeJey5frrO3_WWwkJ7dWKGG-dIuWW7m_lsKqMParPyP8J1GkwJw1NqfpsFFGOtih&_nc_zt=23&_nc_ht=scontent.fmnl45-2.fna&_nc_ss=8&oh=03_Q7cD4wGF0nAFWCOTCndxBmAW4Kbz3iPOO4xD0Gu5cuxdlpUGCg&oe=69DED14D"
-            className="map-image"
-            alt="Paranaque City map"
-          />
-        </section>
+        <section className="map-panel"></section>
       </div>
 
       <div className="bottombar" />

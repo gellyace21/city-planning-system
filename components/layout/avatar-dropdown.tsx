@@ -50,7 +50,6 @@ export function AvatarDropdown() {
             <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
               Profile
             </DropdownMenuItem>
-            <DropdownMenuItem>Billing</DropdownMenuItem>
             <DropdownMenuItem>Settings</DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />

@@ -46,7 +46,7 @@ export default function Login(): React.JSX.Element {
 
   return (
     <div className="fp2-root">
-      <main className="fp2-main">
+      <main className="fp2-main overlay">
         <div className="panel-left">
           <div className="seal-wrap">
             <img
@@ -83,14 +83,9 @@ export default function Login(): React.JSX.Element {
             </button>
           </form>
           {error !== "" ? <p className="text-red-400">{error}</p> : null}
+
           <p className="register-link">
-            No account yet? <a href="/register">Register</a>
-          </p>
-          <p className="register-link">
-            Are you a lead? <a href="/lead-login">Lead login</a>
-          </p>
-          <p className="register-link">
-            Super Admin? <a href="/superadmin-login">Super admin login</a>
+            <a href="/superadmin-login"> System Administrator</a>
           </p>
         </div>
 
@@ -101,7 +96,6 @@ export default function Login(): React.JSX.Element {
             src="images/city-hall.jpg"
             alt="City Hall"
           /> */}
-          <img className="map-svg" src="images/pq-map.png" alt="Map" />
         </div>
       </main>
 
@@ -133,13 +127,16 @@ export default function Login(): React.JSX.Element {
         }
 
         .fp2-main {
-          flex: 1;
           display: flex;
           align-items: center;
           justify-content: center;
-          height: 100%;
+          height: 100vh;
           width: 100%;
           // padding: 0 20px;
+          position: relative;
+          background: url("images/city-hall.jpg");
+          background-position: center;
+          background-size: cover;
         }
 
         .card {
@@ -161,13 +158,21 @@ export default function Login(): React.JSX.Element {
           // padding: 44px 40px 36px;
           display: flex;
           flex-direction: column;
-          height: 100vh;
-          width: 50%;
+          height: 40rem;
+          border-radius: 1rem;
+          min-width: 30rem;
           align-items: center;
-          justify-content: flex-start;
+          justify-content: center;
           justify-self: flex-end;
           z-index: 1;
-          background: #eaffee;
+          // background: #eaffee;
+          background: #e3fff2;
+          background: linear-gradient(
+            180deg,
+            rgba(227, 255, 242, 0.5) 5%,
+            rgba(255, 255, 255, 1) 30%
+          );
+          box-shadow: 0 0 12px rgba(118, 156, 138, 0.2);
         }
 
         .seal-wrap {
@@ -178,7 +183,6 @@ export default function Login(): React.JSX.Element {
           margin-bottom: 16px;
           overflow: hidden;
           box-shadow: 0 4px 14px rgba(76, 175, 138, 0.2);
-          margin-top: 8rem;
         }
 
         .welcome-title {
@@ -211,7 +215,7 @@ export default function Login(): React.JSX.Element {
         }
 
         .form-group input {
-          width: 50%;
+          width: 70%;
           padding: 11px 14px;
           border: 1.5px solid var(--input-border);
           border-radius: 8px;
@@ -228,7 +232,7 @@ export default function Login(): React.JSX.Element {
         }
 
         .btn-login {
-          width: 50%;
+          width: 70%;
           padding: 11px;
           margin-top: 6px;
           justify-self: center;
@@ -256,17 +260,19 @@ export default function Login(): React.JSX.Element {
         }
 
         .panel-right {
-          position: relative;
+          position: absolute;
+          top: 0;
+          left: 0;
           height: 100vh;
-          display: flex;
           align-items: center;
-          flex: 1;
           justify-content: center;
           overflow: hidden;
           // background: #eefpan;
           background: url("images/city-hall.jpg");
           background-position: center;
           background-size: cover;
+          // backdrop-filter: blur(5px);s
+          z-index: 1000;
         }
 
         // .panel-right::before {
@@ -280,22 +286,27 @@ export default function Login(): React.JSX.Element {
 
         .building-bg {
           position: absolute;
+          top: 0;
+          left: 0;
           inset: 0;
           width: 100%;
           height: 100%;
           object-fit: cover;
           object-position: center;
           filter: saturate(1.1) contrast(1.02);
-          z-index: 0;
+          z-index: 10000;
         }
 
-        .panel-overlay {
+        .overlay {
+          // border-image: fill 0
+          //   linear-gradient(
+          //     rgba(234, 255, 238, 0.45),
+          //     rgba(234, 255, 238, 0.45)
+          //   );
           border-image: fill 0
-            linear-gradient(
-              rgba(234, 255, 238, 0.45),
-              rgba(234, 255, 238, 0.45)
-            );
+            linear-gradient(rgba(220, 255, 238, 0.8), rgba(220, 255, 238, 0.8));
           // z-index: 2;
+          //
         }
 
         .map-svg {

@@ -16,7 +16,12 @@ const page = async () => {
     redirect("/dashboard");
   }
 
-  const { monitoringRows, history } = await getMonitoringPageData();
+  const actor =
+    session?.user?.id && role === "admin"
+      ? { id: Number(session.user.id), role: "admin" as const }
+      : undefined;
+
+  const { monitoringRows, history } = await getMonitoringPageData(actor);
 
   return (
     <div>

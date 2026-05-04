@@ -1,6 +1,49 @@
 "use client";
+import { getSession, signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-export default function LeadLogin(): React.JSX.Element {
+export default function Login(): React.JSX.Element {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loading) return;
+
+    setError("");
+    setLoading(true);
+
+    try {
+      const res = await signIn("credentials", {
+        redirect: false,
+        email,
+        password,
+      });
+
+      if (res?.error) {
+        setError("Invalid credentials");
+        return;
+      }
+
+      const session = await getSession();
+      const role = session?.user?.role;
+
+      if (role === "superadmin") {
+        router.replace("/dashboard/superadmin");
+      } else if (role === "admin") {
+        router.replace("/dashboard");
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="fp2-root">
       <main className="fp2-main">
@@ -14,19 +57,36 @@ export default function LeadLogin(): React.JSX.Element {
           </div>
 
           <h2 className="welcome-title">Welcome!</h2>
-          <p className="welcome-sub">
-            Use your secure lead access link to continue.
-          </p>
+          <p className="welcome-sub">Please login to continue</p>
 
-          <div className="login-form">
-            <p className="welcome-sub">
-              Use your secure lead access link to enter the portal. This page no
-              longer accepts passwords.
-            </p>
-            <a className="btn-login" href="/login">
-              Go to Admin Login
-            </a>
-          </div>
+          <form onSubmit={handleSubmit} className="login-form">
+            <div className="form-group">
+              <input
+                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                name="email"
+                placeholder="Email"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <input
+                onChange={(e) => setPassword(e.target.value)}
+                type="password"
+                name="password"
+                placeholder="Password"
+                required
+              />
+            </div>
+            <button className="btn-login" type="submit">
+              Login
+            </button>
+          </form>
+          {error !== "" ? <p className="text-red-400">{error}</p> : null}
+
+          <p className="register-link">
+            <a href="/superadmin-login"> System Administrator</a>
+          </p>
         </div>
 
         <div className="panel-right panel-overlay">
@@ -36,7 +96,6 @@ export default function LeadLogin(): React.JSX.Element {
             src="images/city-hall.jpg"
             alt="City Hall"
           /> */}
-          <img className="map-svg" src="images/pq-map.png" alt="Map" />
         </div>
       </main>
 
@@ -52,24 +111,12 @@ export default function LeadLogin(): React.JSX.Element {
           --text-muted: #5a8070;
           --input-border: #a8d0bf;
 
-          min-height: calc(100vh - 84px);
+          min-height: 100%;
           display: flex;
           width: 100%;
           flex-direction: column;
           background: var(--green-bg);
           font-family: "Lato", sans-serif;
-        }
-
-        .header-logo {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          background: var(--white);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
-          flex-shrink: 0;
         }
 
         .seal-img {
@@ -79,14 +126,6 @@ export default function LeadLogin(): React.JSX.Element {
           object-position: center;
         }
 
-        .fp2-header h1 {
-          font-weight: 700;
-          font-size: 13px;
-          letter-spacing: 1.5px;
-          text-transform: uppercase;
-          color: var(--white);
-        }
-
         .fp2-main {
           flex: 1;
           display: flex;
@@ -94,6 +133,7 @@ export default function LeadLogin(): React.JSX.Element {
           justify-content: center;
           height: 100%;
           width: 100%;
+          // padding: 0 20px;
         }
 
         .card {
@@ -112,15 +152,17 @@ export default function LeadLogin(): React.JSX.Element {
         }
 
         .panel-left {
+          // padding: 44px 40px 36px;
           display: flex;
           flex-direction: column;
           height: 100vh;
           width: 50%;
           align-items: center;
-          justify-content: center;
+          justify-content: flex-start;
           justify-self: flex-end;
           z-index: 1;
-          background: #eaffee;
+          // background: #eaffee;
+          background: #e3fff2;
         }
 
         .seal-wrap {
@@ -131,6 +173,7 @@ export default function LeadLogin(): React.JSX.Element {
           margin-bottom: 16px;
           overflow: hidden;
           box-shadow: 0 4px 14px rgba(76, 175, 138, 0.2);
+          margin-top: 8rem;
         }
 
         .welcome-title {
@@ -215,10 +258,21 @@ export default function LeadLogin(): React.JSX.Element {
           flex: 1;
           justify-content: center;
           overflow: hidden;
+          // background: #eefpan;
           background: url("images/city-hall.jpg");
           background-position: center;
           background-size: cover;
+          backdrop-filter: blur(5px);
         }
+
+        // .panel-right::before {
+        //   content: "";
+        //   position: absolute;
+        //   width: 50%;
+        //   background: rgba(234, 255, 238, 0.45);
+        //   z-index: 1;
+        //   height: 100%;
+        // }
 
         .building-bg {
           position: absolute;
@@ -232,11 +286,15 @@ export default function LeadLogin(): React.JSX.Element {
         }
 
         .panel-overlay {
+          // border-image: fill 0
+          //   linear-gradient(
+          //     rgba(234, 255, 238, 0.45),
+          //     rgba(234, 255, 238, 0.45)
+          //   );
           border-image: fill 0
-            linear-gradient(
-              rgba(234, 255, 238, 0.45),
-              rgba(234, 255, 238, 0.45)
-            );
+            linear-gradient(rgba(220, 255, 238, 0.8), rgba(220, 255, 238, 0.8));
+          // z-index: 2;
+          //
         }
 
         .map-svg {

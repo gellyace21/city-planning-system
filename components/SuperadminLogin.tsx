@@ -59,7 +59,7 @@ export default function SuperadminLogin(): React.JSX.Element {
             />
           </div>
 
-          <h2 className="welcome-title">Super Admin Portal</h2>
+          <h2 className="welcome-title">System Administrator</h2>
           <p className="welcome-sub">Sign in to manage admin accounts</p>
 
           <form onSubmit={handleSubmit} className="login-form">
@@ -68,7 +68,7 @@ export default function SuperadminLogin(): React.JSX.Element {
                 onChange={(e) => setEmail(e.target.value)}
                 type="email"
                 name="email"
-                placeholder="Super admin email"
+                placeholder="System Administrator Email"
                 required
               />
             </div>
@@ -88,13 +88,10 @@ export default function SuperadminLogin(): React.JSX.Element {
 
           {error !== "" ? <p className="text-red-400">{error}</p> : null}
           <p className="register-link">
-            Back to regular login? <a href="/login">Login</a>
+            Return to User Login? <a href="/login">Login</a>
           </p>
         </div>
-
-        <div className="panel-right panel-overlay">
-          <img className="map-svg" src="images/pq-map.png" alt="Map" />
-        </div>
+        <div className="panel-right panel-overlay"></div>
       </main>
 
       <style jsx>{`

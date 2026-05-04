@@ -159,6 +159,8 @@ export default function ProfileModal({
           display: flex;
           align-items: center;
           justify-content: center;
+          width: 100%;
+          height: 100vh;
           z-index: 1000;
         }
 
@@ -524,7 +526,7 @@ export default function ProfileModal({
               />
             </div>
             <div
-              className="btn-save"
+              className="text-blue-500 cursor-pointer font-medium mt-2 mb-4 hover:text-blue-700 transition-colors w-max"
               role="button"
               tabIndex={0}
               onClick={() => setShowPassword((prev) => !prev)}

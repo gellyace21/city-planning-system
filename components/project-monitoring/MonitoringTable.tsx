@@ -54,11 +54,10 @@ const MONITORING_NUMERIC_FIELDS = new Set<keyof MonitoringRow>([
 ]);
 
 const INITIAL_COLUMN_WIDTHS = [
-  44, 220, 160, 120, 120, 120, 120, 120, 130, 120, 180, 180, 110, 220, 180,
-  44,
+  56, 260, 190, 150, 150, 150, 160, 150, 150, 150, 210, 210, 140, 260, 200, 56,
 ];
 
-const MIN_COLUMN_WIDTH = 72;
+const MIN_COLUMN_WIDTH = 90;
 
 const MIN_COLUMN_WIDTH_BY_INDEX: Record<number, number> = {
   0: 40,
@@ -173,7 +172,7 @@ export default function MonitoringTable({
               onChange={(e) => setEditValue(e.target.value)}
               onBlur={commitEdit}
               onKeyDown={handleKeyDown}
-              className="w-full min-w-0 min-h-12 text-[11px] border border-emerald-400 rounded px-1 py-0.5 bg-emerald-50 focus:outline-none"
+              className="w-full min-w-0 min-h-12 text-[12px] border border-emerald-400 rounded px-2 py-1 bg-emerald-50 focus:outline-none"
             />
           ) : (
             <input
@@ -183,7 +182,7 @@ export default function MonitoringTable({
               onChange={(e) => setEditValue(e.target.value)}
               onBlur={commitEdit}
               onKeyDown={handleKeyDown}
-              className="w-full min-w-0 text-[11px] border border-emerald-400 rounded px-1 py-0.5 bg-emerald-50 focus:outline-none"
+              className="w-full min-w-0 text-[12px] border border-emerald-400 rounded px-2 py-1 bg-emerald-50 focus:outline-none"
             />
           )}
           {commentCount > 0 && (
@@ -241,15 +240,18 @@ export default function MonitoringTable({
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="min-w-full w-max table-fixed text-[14px] border-collapse [&_th]:align-top [&_td]:align-top [&_td]:wrap-break-word [&_td]:whitespace-normal">
+        <table className="min-w-full w-max table-fixed text-[15px] border-collapse [&_th]:align-top [&_td]:align-top [&_td]:wrap-break-word [&_td]:whitespace-normal">
           <colgroup>
             {columnWidths.map((width, index) => (
-              <col key={`monitoring-col-${index}`} style={{ width: `${width}px` }} />
+              <col
+                key={`monitoring-col-${index}`}
+                style={{ width: `${width}px` }}
+              />
             ))}
           </colgroup>
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200 text-gray-600">
-              <th className="w-8 px-1 py-2 text-[14px] relative">
+              <th className="w-10 px-2 py-2.5 text-[15px] relative">
                 <input
                   type="checkbox"
                   className="rounded"
@@ -281,7 +283,7 @@ export default function MonitoringTable({
               ].map(([col, label], index) => (
                 <th
                   key={col}
-                  className="px-1.5 py-2 text-left text-[10px] font-bold uppercase tracking-tight whitespace-normal wrap-break-word cursor-pointer hover:bg-emerald-50 relative select-none"
+                  className="px-2 py-2.5 text-left text-[11px] font-bold uppercase tracking-tight whitespace-normal wrap-break-word cursor-pointer hover:bg-emerald-50 relative select-none"
                   onClick={() => handleSort(col as MonitoringSortKey)}
                 >
                   <span>

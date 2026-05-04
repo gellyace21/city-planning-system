@@ -36,11 +36,34 @@ export const authOptions: AuthOptions = {
       credentials: {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
+        token: { label: "Token", type: "text" },
       },
       async authorize(credentials) {
         if (!credentials) return null;
         const dbPath = path.join(process.cwd(), "db.json");
         const db = JSON.parse(readFileSync(dbPath, "utf-8"));
+
+        const token = String(credentials.token || "").trim();
+        if (token) {
+          const link = (db.generated_links || []).find(
+            (entry: { token: string }) => entry.token === token,
+          );
+          if (link) {
+            const lead = (db.leads || []).find(
+              (u: Lead) => u.id === link.lead_id,
+            );
+            if (lead) {
+              return {
+                id: lead.id,
+                name: lead.username || `Lead ${lead.id}`,
+                email: lead.username || `lead-${lead.id}`,
+                role: "lead",
+                department: lead.department,
+              };
+            }
+          }
+          return null;
+        }
 
         const superadmin = db.admins.find(
           (u: Admin) =>
@@ -75,21 +98,6 @@ export const authOptions: AuthOptions = {
             email: user.email,
             role: "admin",
             profile_pic: user.profile_pic,
-          };
-        }
-
-        // Try lead by username
-        user = db.leads.find((u: Lead) => u.username === credentials.email);
-        if (
-          user &&
-          bcrypt.compareSync(credentials.password, user.password_hash)
-        ) {
-          return {
-            id: user.id,
-            name: user.username,
-            email: user.username,
-            role: "lead",
-            department: user.department,
           };
         }
 

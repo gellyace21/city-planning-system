@@ -91,6 +91,30 @@ export interface NotificationEntry {
   read_at?: string | null;
 }
 
+export interface LeadFileSummary {
+  id: number;
+  lead_id: number;
+  file_name: string;
+  uploaded_at: string;
+  row_count: number;
+  department?: string;
+  lead_username?: string;
+  is_submitted: boolean;
+  submitted_at?: string | null;
+}
+
+export interface FileCommentEntry {
+  id: number;
+  file_id: number;
+  lead_id: number;
+  comment_text: string;
+  created_by_id: number;
+  created_by_role: "admin" | "superadmin" | "lead";
+  created_by_name: string;
+  created_by_avatar?: string;
+  created_at: string;
+}
+
 export interface CommentThreadSummary {
   total: number;
   byCell: Record<string, number>;

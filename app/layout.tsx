@@ -1,5 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter, Montserrat } from "next/font/google";
+import {
+  Geist,
+  Geist_Mono,
+  Inter,
+  Josefin_Sans,
+  Montserrat,
+  Open_Sans,
+  Rubik,
+} from "next/font/google";
 import "@/app/globals.css";
 import Footer from "../components/layout/footer";
 import Nav from "../components/layout/navbar";
@@ -11,6 +19,24 @@ const montserrat = Montserrat({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-montserrat-next",
+});
+
+const josefin = Josefin_Sans({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-josefin",
+});
+
+const openSans = Open_Sans({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-open-sans",
+});
+
+const rubik = Rubik({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-rubik",
 });
 
 const geistSans = Geist({
@@ -36,14 +62,21 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn("font-sans", inter.variable, montserrat.variable)}
+      className={cn(
+        "font-sans",
+        inter.variable,
+        montserrat.variable,
+        josefin.variable,
+        openSans.variable,
+        rubik.variable,
+      )}
     >
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased `}
+        className={`${geistSans.variable} ${geistMono.variable} font-open-sans antialiased `}
       >
         <AuthProvider>
           <Nav />
-          <main className="flex min-h-screen flex-col items-center justify-start gap-12 relative mt-24">
+          <main className="flex min-h-screen flex-col items-center justify-start gap-12 relative mt-6">
             {children}
           </main>
           <Footer />

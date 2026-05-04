@@ -11,19 +11,24 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import {
   addCommentToEntity,
   ActorContext,
+  addLeadFileComment,
+  deleteLeadUploadedFile,
   getActorNotifications,
   getCommentsForEntity,
   createAipRow,
   createMonitoringRow,
   deleteAipRows,
   deleteMonitoringRows,
+  getLeadFileComments,
   getProjectMonitoringData,
   getLeadUploadedFiles,
+  FileCommentEntry,
   LeadFileSummary,
   LeadUploadInputRow,
   markNotificationAsRead,
   reviewAipSuggestion,
   restoreHistoryEntry,
+  submitLeadUpload,
   uploadLeadAipRows,
   updateAipRowField,
   updateMonitoringRowField,
@@ -55,7 +60,8 @@ export async function fetchProjectMonitoringDataAction(): Promise<{
   monitoringRows: MonitoringRow[];
   history: EditHistoryEntry[];
 }> {
-  return getProjectMonitoringData();
+  const actor = await requireActor();
+  return getProjectMonitoringData(actor);
 }
 
 export async function createAipRowAction(): Promise<{
@@ -150,6 +156,41 @@ export async function fetchLeadUploadedFilesAction(): Promise<
 > {
   const actor = await requireActor();
   return getLeadUploadedFiles(actor);
+}
+
+export async function fetchLeadFileCommentsAction(): Promise<
+  FileCommentEntry[]
+> {
+  const actor = await requireActor();
+  return getLeadFileComments(actor);
+}
+
+export async function addLeadFileCommentAction(payload: {
+  file_id: number;
+  comment_text: string;
+}): Promise<FileCommentEntry> {
+  const actor = await requireActor();
+  return addLeadFileComment(actor, payload);
+}
+
+export async function deleteLeadUploadedFileAction(
+  fileId: number,
+): Promise<{ deletedFileId: number; removedRowIds: number[] }> {
+  const actor = await requireActor();
+  const result = await deleteLeadUploadedFile(actor, fileId);
+  revalidatePath(PAGE_PATH);
+  revalidatePath("/dashboard/annual-investment-plan");
+  return result;
+}
+
+export async function submitLeadUploadAction(
+  fileId: number,
+): Promise<LeadFileSummary> {
+  const actor = await requireActor();
+  const result = await submitLeadUpload(actor, fileId);
+  revalidatePath(PAGE_PATH);
+  revalidatePath("/dashboard/annual-investment-plan");
+  return result;
 }
 
 export async function reviewAipSuggestionAction(

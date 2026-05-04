@@ -9,7 +9,7 @@ import { redirect } from "next/navigation";
 const page = async ({
   searchParams,
 }: {
-  searchParams?: Promise<{ view?: string }>;
+  searchParams?: Promise<{ view?: string; fileId?: string }>;
 }) => {
   const session = await getServerSession(authOptions);
   const role = session?.user?.role;
@@ -23,12 +23,21 @@ const page = async ({
 
   const params = (await searchParams) ?? {};
   const showTableEditor = params.view === "table";
+  const parsedUploadId = Number(params.fileId);
+  const initialUploadId = Number.isFinite(parsedUploadId)
+    ? parsedUploadId
+    : null;
 
   if (role === "lead" && !showTableEditor) {
     return <LeadWorkspacePortal />;
   }
 
-  const { aipRows, history } = await getAipPageData();
+  const actor =
+    session?.user?.id && (role === "admin" || role === "lead")
+      ? { id: Number(session.user.id), role: role as "admin" | "lead" }
+      : undefined;
+
+  const { aipRows, history } = await getAipPageData(actor);
 
   return (
     <ProjectTable
@@ -36,6 +45,7 @@ const page = async ({
       initialAipRows={aipRows}
       initialMonitoringRows={[]}
       initialHistory={history}
+      initialUploadId={initialUploadId}
     />
   );
 };

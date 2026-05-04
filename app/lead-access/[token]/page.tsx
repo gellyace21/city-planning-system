@@ -13,7 +13,8 @@ export default function LeadAccessPage(): React.JSX.Element {
   const [submitting, setSubmitting] = useState(false);
   const [valid, setValid] = useState(false);
   const [leadUsername, setLeadUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [needsUsername, setNeedsUsername] = useState(false);
+  const [usernameInput, setUsernameInput] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export default function LeadAccessPage(): React.JSX.Element {
           setValid(false);
         } else {
           setLeadUsername(data.leadUsername || "");
+          setNeedsUsername(Boolean(data.needsUsername));
           setValid(Boolean(data.valid));
         }
       } catch {
@@ -43,8 +45,10 @@ export default function LeadAccessPage(): React.JSX.Element {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!password.trim() || !token) {
-      setError("Please enter your password.");
+    if (!token) return;
+
+    if (needsUsername && !usernameInput.trim()) {
+      setError("Please enter your username.");
       return;
     }
 
@@ -55,7 +59,9 @@ export default function LeadAccessPage(): React.JSX.Element {
       const verifyResponse = await fetch(`/api/lead-links/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify(
+          needsUsername ? { username: usernameInput.trim() } : {},
+        ),
       });
 
       const verifyData = await verifyResponse.json();
@@ -66,8 +72,7 @@ export default function LeadAccessPage(): React.JSX.Element {
 
       const signInResult = await signIn("credentials", {
         redirect: false,
-        email: leadUsername,
-        password,
+        token,
       });
 
       if (signInResult?.error) {
@@ -193,25 +198,31 @@ export default function LeadAccessPage(): React.JSX.Element {
         <>
           <h1>Lead Access Portal</h1>
           <p>
-            Enter your password to continue to your assigned workspace. If this
-            is your first time using this link, this will become your new
-            password.
+            {needsUsername
+              ? "Enter your username to continue to your assigned workspace."
+              : "Click continue to enter your assigned workspace."}
           </p>
-          <div className="username-chip">Lead: {leadUsername}</div>
+          {leadUsername ? (
+            <div className="username-chip">Lead: {leadUsername}</div>
+          ) : null}
 
           {error ? <div className="error">{error}</div> : null}
 
           <form onSubmit={handleSubmit}>
-            <label className="field-label" htmlFor="lead-password">
-              Password
-            </label>
-            <input
-              id="lead-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-            />
+            {needsUsername ? (
+              <>
+                <label className="field-label" htmlFor="lead-username">
+                  Username
+                </label>
+                <input
+                  id="lead-username"
+                  type="text"
+                  value={usernameInput}
+                  onChange={(e) => setUsernameInput(e.target.value)}
+                  placeholder="Enter your username"
+                />
+              </>
+            ) : null}
             <button type="submit" className="btn" disabled={submitting}>
               {submitting ? "Verifying..." : "Continue"}
             </button>
