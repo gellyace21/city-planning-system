@@ -25,6 +25,7 @@ import {
   FileCommentEntry,
   LeadFileSummary,
   LeadUploadInputRow,
+  markAllNotificationsAsRead,
   markNotificationAsRead,
   reviewAipSuggestion,
   restoreHistoryEntry,
@@ -234,6 +235,16 @@ export async function markNotificationReadAction(
 ): Promise<NotificationEntry> {
   const actor = await requireActor();
   const updated = await markNotificationAsRead(actor, notificationId);
+  revalidatePath(PAGE_PATH);
+  revalidatePath("/dashboard/annual-investment-plan");
+  return updated;
+}
+
+export async function markAllNotificationsReadAction(): Promise<
+  NotificationEntry[]
+> {
+  const actor = await requireActor();
+  const updated = await markAllNotificationsAsRead(actor);
   revalidatePath(PAGE_PATH);
   revalidatePath("/dashboard/annual-investment-plan");
   return updated;

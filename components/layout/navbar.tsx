@@ -9,10 +9,10 @@ import { useSession } from "next-auth/react";
 import { IconBell, IconHome } from "@tabler/icons-react";
 import {
   fetchNotificationsAction,
+  markAllNotificationsReadAction,
   markNotificationReadAction,
 } from "@/lib/services/projectMonitoringActions";
 import { NotificationEntry } from "@/components/project-monitoring/types";
-import path from "node:path/win32";
 
 const Navbar = () => {
   const pathname = usePathname();
@@ -24,6 +24,7 @@ const Navbar = () => {
 
   const [notifications, setNotifications] = useState<NotificationEntry[]>([]);
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
+  const [markingAll, setMarkingAll] = useState<boolean>(false);
   const notificationPanelRef = useRef<HTMLLIElement | null>(null);
 
   const dashboardTarget = isLead
@@ -78,6 +79,19 @@ const Navbar = () => {
       );
     } catch {
       // Ignore read update failures so navigation stays uninterrupted.
+    }
+  };
+
+  const markAllNotificationsRead = async (): Promise<void> => {
+    if (unreadCount < 2) return;
+    setMarkingAll(true);
+    try {
+      const updated = await markAllNotificationsReadAction();
+      setNotifications(updated.slice(0, 80));
+    } catch {
+      // Ignore bulk update failures so navigation stays uninterrupted.
+    } finally {
+      setMarkingAll(false);
     }
   };
 
@@ -182,10 +196,11 @@ const Navbar = () => {
                   <button
                     type="button"
                     onClick={() => setShowNotifications((prev) => !prev)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-white/25 bg-white/15 px-3 py-1.5 text-sm font-semibold text-white hover:bg-white group"
+                    className="inline-flex items-center gap-1 rounded-lg border border-black/25 bg-grey/15 px-3 py-1.5 text-sm font-semibold text-white hover:bg-black/15  hover:cursor-pointer active:scale-95 transition-transform group"
                   >
+                    {/*Notification Icon*/}
                     <IconBell
-                      className="group-hover:stroke-black transition duration-200"
+                      className="stroke-black group-hover:stroke-(--primary) transition duration-200"
                       size={16}
                     />
 
@@ -202,26 +217,73 @@ const Navbar = () => {
                           No notifications.
                         </p>
                       ) : (
-                        notifications.map((entry) => (
-                          <button
-                            type="button"
-                            key={entry.id}
-                            onClick={() => {
-                              void markNotificationRead(entry);
-                            }}
-                            className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 ${entry.read_at ? "opacity-70" : ""}`}
-                          >
-                            <p className="text-xs text-gray-500">
-                              {new Date(entry.created_at).toLocaleString()}
-                            </p>
-                            <p className="text-sm text-gray-800">
-                              {entry.message}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              by {entry.actor_name} ({entry.actor_role})
-                            </p>
-                          </button>
-                        ))
+                        <div className="divide-y divide-gray-100">
+                          <div className="px-4 py-2 flex items-center justify-between">
+                            <span className="text-xs text-gray-500">
+                              {unreadCount} unread
+                            </span>
+                            {unreadCount > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void markAllNotificationsRead();
+                                }}
+                                disabled={markingAll}
+                                className="text-[10px] font-semibold text-sky-700 hover:underline disabled:opacity-60"
+                              >
+                                {markingAll ? "Marking..." : "Mark all as read"}
+                              </button>
+                            )}
+                          </div>
+                          {notifications.map((entry) => (
+                            <div
+                              key={entry.id}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => {
+                                void markNotificationRead(entry);
+                              }}
+                              onKeyDown={(event) => {
+                                if (
+                                  event.key === "Enter" ||
+                                  event.key === " "
+                                ) {
+                                  event.preventDefault();
+                                  void markNotificationRead(entry);
+                                }
+                              }}
+                              className={`w-full text-left px-4 py-3 hover:bg-gray-50 ${entry.read_at ? "opacity-70" : ""}`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-xs text-gray-500">
+                                    {new Date(
+                                      entry.created_at,
+                                    ).toLocaleString()}
+                                  </p>
+                                  <p className="text-sm text-gray-800">
+                                    {entry.message}
+                                  </p>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    by {entry.actor_name} ({entry.actor_role})
+                                  </p>
+                                </div>
+                                {!entry.read_at && (
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      void markNotificationRead(entry);
+                                    }}
+                                    className="text-[10px] font-semibold text-sky-700 hover:underline"
+                                  >
+                                    Mark as read
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
                   )}

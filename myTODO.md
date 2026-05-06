@@ -3,3 +3,4 @@
 - fix top margin in AIP table
 - fix navbar buttons
 - history sidebar overlaps with table
+- Notification in navbar cannot be seen normal state

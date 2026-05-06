@@ -1650,3 +1650,37 @@ export async function markNotificationAsRead(
   await writeDb(db);
   return toNotificationEntry(notifications[idx]);
 }
+
+export async function markAllNotificationsAsRead(
+  actor: ActorContext,
+): Promise<NotificationEntry[]> {
+  const db = await readDb();
+  const notifications = getNotifications(db);
+  const now = new Date().toISOString();
+  let changed = false;
+
+  const updated = notifications.map((entry) => {
+    if (
+      entry.recipient_id === actor.id &&
+      entry.recipient_role === actor.role &&
+      !entry.read_at
+    ) {
+      changed = true;
+      return { ...entry, read_at: now };
+    }
+    return entry;
+  });
+
+  if (changed) {
+    db.notifications = updated;
+    await writeDb(db);
+  }
+
+  return updated
+    .map(toNotificationEntry)
+    .filter(
+      (entry) =>
+        entry.recipient_id === actor.id && entry.recipient_role === actor.role,
+    )
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}

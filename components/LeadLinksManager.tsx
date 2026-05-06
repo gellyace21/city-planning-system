@@ -26,6 +26,8 @@ type LeadUploadedFile = {
   lead_department?: string;
 };
 
+const CUSTOM_DEPARTMENT_VALUE = "__custom__";
+
 export default function LeadLinksManager(): React.JSX.Element | null {
   const { data: session, status } = useSession();
   const isAdminView = ["admin", "superadmin"].includes(
@@ -34,7 +36,10 @@ export default function LeadLinksManager(): React.JSX.Element | null {
 
   const [linkValue, setLinkValue] = useState("");
 
-  const [leadDepartment, setLeadDepartment] = useState("General");
+  const [selectedDepartment, setSelectedDepartment] = useState("General");
+  const [customDepartment, setCustomDepartment] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("All");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [generatedLinks, setGeneratedLinks] = useState<GeneratedLink[]>([]);
   const [leadUploads, setLeadUploads] = useState<
     Record<number, LeadUploadedFile[]>
@@ -43,6 +48,10 @@ export default function LeadLinksManager(): React.JSX.Element | null {
   const [linkLoading, setLinkLoading] = useState(false);
   const [linkMessage, setLinkMessage] = useState("");
   const [linkError, setLinkError] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<GeneratedLink | null>(
+    null,
+  );
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const groupedLinks = useMemo(() => {
     return generatedLinks.reduce(
@@ -68,6 +77,36 @@ export default function LeadLinksManager(): React.JSX.Element | null {
     );
     return [...ordered, ...extras];
   }, [groupedLinks]);
+
+  const resolvedLeadDepartment = useMemo(() => {
+    if (selectedDepartment === CUSTOM_DEPARTMENT_VALUE) {
+      return customDepartment.trim() || "General";
+    }
+    return selectedDepartment.trim() || "General";
+  }, [customDepartment, selectedDepartment]);
+
+  const departmentFilterOptions = useMemo(
+    () => ["All", ...groupedDepartments],
+    [groupedDepartments],
+  );
+
+  const filteredDepartments = useMemo(() => {
+    if (departmentFilter === "All") return groupedDepartments;
+    return groupedDepartments.filter((dept) => dept === departmentFilter);
+  }, [departmentFilter, groupedDepartments]);
+
+  const filteredLinks = useMemo(() => {
+    return generatedLinks.filter((link) => {
+      const dept = link.lead_department || "General";
+      return departmentFilter === "All" || dept === departmentFilter;
+    });
+  }, [generatedLinks, departmentFilter]);
+
+  const canGenerate =
+    isAdminView &&
+    !linkLoading &&
+    (selectedDepartment !== CUSTOM_DEPARTMENT_VALUE ||
+      Boolean(customDepartment.trim()));
 
   const fetchLinks = async () => {
     if (!isAdminView) return;
@@ -110,10 +149,28 @@ export default function LeadLinksManager(): React.JSX.Element | null {
     }
   }, [isAdminView, status]);
 
+  useEffect(() => {
+    if (
+      departmentFilter !== "All" &&
+      !groupedDepartments.includes(departmentFilter)
+    ) {
+      setDepartmentFilter("All");
+    }
+  }, [departmentFilter, groupedDepartments]);
+
   const handleGenerateLink = async () => {
     setLinkLoading(true);
     setLinkError("");
     setLinkMessage("");
+
+    if (
+      selectedDepartment === CUSTOM_DEPARTMENT_VALUE &&
+      !customDepartment.trim()
+    ) {
+      setLinkError("Please enter a custom department.");
+      setLinkLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch("/api/lead-links", {
@@ -121,7 +178,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify({
-          department: leadDepartment.trim() || "General",
+          department: resolvedLeadDepartment,
         }),
       });
 
@@ -167,9 +224,33 @@ export default function LeadLinksManager(): React.JSX.Element | null {
     }
   };
 
+  const handleDeleteLead = async (entry: GeneratedLink): Promise<void> => {
+    setDeleteLoading(true);
+    setLinkError("");
+    try {
+      const response = await fetch(`/api/lead-links?leadId=${entry.lead_id}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to delete lead.");
+      }
+      setPendingDelete(null);
+      await fetchLinks();
+    } catch (error) {
+      setLinkError(
+        error instanceof Error ? error.message : "Failed to delete lead.",
+      );
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const handleRefresh = () => {
     setLinkValue("");
-    setLeadDepartment("General");
+    setSelectedDepartment("General");
+    setCustomDepartment("");
     setLinkMessage("");
     setLinkError("");
   };
@@ -197,6 +278,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
         .lead-row {
           width: 100%;
           display: flex;
+          flex-wrap: wrap;
           align-items: center;
           gap: 12px;
           justify-content: center;
@@ -217,8 +299,13 @@ export default function LeadLinksManager(): React.JSX.Element | null {
           padding: 0 12px;
           outline: none;
           width: 20%;
+          min-width: 180px;
           color: #2c4a3a;
           background: #ffffff;
+        }
+
+        .custom-input {
+          min-width: 200px;
         }
 
         .lead-input:focus {
@@ -349,6 +436,183 @@ export default function LeadLinksManager(): React.JSX.Element | null {
           letter-spacing: 0.06em;
         }
 
+        .generated-controls {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          flex-wrap: wrap;
+          padding: 8px;
+          border: 1px solid #e3f2eb;
+          border-radius: 10px;
+          background: #f8fdfb;
+        }
+
+        .filter-group {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 11px;
+          color: #3b5c50;
+        }
+
+        .filter-label {
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.4px;
+          font-size: 10px;
+        }
+
+        .filter-select {
+          height: 32px;
+          border: 1px solid #c9e5d8;
+          border-radius: 6px;
+          padding: 0 8px;
+          font-size: 11px;
+          background: #ffffff;
+          color: #2c4a3a;
+        }
+
+        .view-toggle {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .view-toggle-btn {
+          border: 1px solid #c9e5d8;
+          border-radius: 6px;
+          background: #ffffff;
+          color: #2f6f59;
+          font-size: 11px;
+          font-weight: 700;
+          padding: 6px 10px;
+          cursor: pointer;
+        }
+
+        .view-toggle-btn.active {
+          background: #2f6f59;
+          border-color: #2f6f59;
+          color: #ffffff;
+        }
+
+        .generated-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+          gap: 12px;
+          padding: 8px;
+        }
+
+        .generated-card {
+          border: 1px solid #dcefe7;
+          border-radius: 10px;
+          padding: 10px;
+          background: #ffffff;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .generated-card-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          font-size: 12px;
+          color: #2c4a3a;
+        }
+
+        .generated-card-meta {
+          font-size: 11px;
+          color: #426457;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .delete-btn {
+          border: 1px solid #f4c7c7;
+          border-radius: 6px;
+          background: #fff1f1;
+          color: #b42318;
+          font-size: 11px;
+          font-weight: 700;
+          padding: 6px 10px;
+          cursor: pointer;
+        }
+
+        .empty-state {
+          font-size: 11px;
+          color: #6b8e7f;
+          font-style: italic;
+          padding: 12px;
+        }
+
+        .modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.35);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 16px;
+          z-index: 50;
+        }
+
+        .modal-card {
+          width: min(420px, 92vw);
+          border-radius: 12px;
+          border: 1px solid #dcefe7;
+          background: #ffffff;
+          padding: 16px;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+        }
+
+        .modal-title {
+          font-size: 14px;
+          font-weight: 700;
+          color: #2c4a3a;
+        }
+
+        .modal-body {
+          margin-top: 8px;
+          font-size: 12px;
+          color: #4a7060;
+        }
+
+        .modal-actions {
+          margin-top: 16px;
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+        }
+
+        .modal-btn {
+          padding: 8px 12px;
+          border-radius: 8px;
+          font-size: 11px;
+          font-weight: 700;
+          border: 1px solid;
+          cursor: pointer;
+        }
+
+        .modal-btn.cancel {
+          background: #ffffff;
+          border-color: #d0d5dd;
+          color: #344054;
+        }
+
+        .modal-btn.delete {
+          background: #b42318;
+          border-color: #b42318;
+          color: #ffffff;
+        }
+
+        .modal-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
         .department-section {
           border: 1px solid #e2efe8;
           border-radius: 10px;
@@ -416,6 +680,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
         .generated-actions {
           display: flex;
           align-items: center;
+          flex-wrap: wrap;
           gap: 8px;
         }
 
@@ -475,15 +740,25 @@ export default function LeadLinksManager(): React.JSX.Element | null {
       <div className="lead-row">
         <select
           className="lead-input"
-          value={leadDepartment}
-          onChange={(e) => setLeadDepartment(e.target.value)}
+          value={selectedDepartment}
+          onChange={(e) => setSelectedDepartment(e.target.value)}
         >
           {departmentOptions.map((department) => (
             <option key={department} value={department}>
               {department}
             </option>
           ))}
+          <option value={CUSTOM_DEPARTMENT_VALUE}>Custom...</option>
         </select>
+        {selectedDepartment === CUSTOM_DEPARTMENT_VALUE ? (
+          <input
+            type="text"
+            className="lead-input custom-input"
+            placeholder="Custom department"
+            value={customDepartment}
+            onChange={(e) => setCustomDepartment(e.target.value)}
+          />
+        ) : null}
         <div className="link-row">
           <div className="link-combined">
             <span className="link-label">LINK</span>
@@ -499,7 +774,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
             type="button"
             className="generate-btn"
             onClick={handleGenerateLink}
-            disabled={linkLoading || !isAdminView}
+            disabled={!canGenerate}
           >
             {linkLoading ? "Generating..." : "Generate Lead Link"}
           </button>
@@ -552,110 +827,287 @@ export default function LeadLinksManager(): React.JSX.Element | null {
       {generatedLinks.length > 0 ? (
         <div className="generated-list">
           <div className="generated-title">Generated Links by Department</div>
-          {groupedDepartments.map((department) => {
-            const theme = getDepartmentTheme(department);
-            const entries = groupedLinks[department] || [];
-            if (entries.length === 0) return null;
-            return (
-              <div className="department-section" key={department}>
-                <div
-                  className="department-header"
-                  style={{
-                    background: theme.color.bg,
-                    borderColor: theme.color.border,
-                  }}
-                >
-                  <span
-                    className="department-badge"
-                    style={{
-                      color: theme.color.text,
-                      borderColor: theme.color.border,
-                      background: "#ffffff",
-                    }}
-                  >
-                    {department}
-                  </span>
-                  <span className="department-meta">
-                    {entries.length} lead{entries.length > 1 ? "s" : ""}
-                  </span>
-                </div>
-                <div className="department-links">
-                  {entries.map((entry) => {
-                    const entryTheme = getDepartmentTheme(
-                      entry.lead_department || department,
-                    );
-                    return (
-                      <div className="generated-item" key={entry.id}>
-                        <div className="generated-meta">
-                          <strong>
-                            {entry.lead_username || "Unclaimed lead"}
-                          </strong>
-                          <span
-                            className="department-chip"
-                            style={{
-                              background: entryTheme.color.bg,
-                              color: entryTheme.color.text,
-                              borderColor: entryTheme.color.border,
-                            }}
-                          >
-                            {entryTheme.label}
-                          </span>{" "}
-                          | {new Date(entry.created_at).toLocaleString()}
-                          {entry.last_accessed_at
-                            ? ` | Last used: ${new Date(entry.last_accessed_at).toLocaleString()}`
-                            : " | Not used yet"}
-                        </div>
-                        <div className="generated-actions">
-                          <button
-                            type="button"
-                            className="view-btn"
-                            onClick={() =>
-                              setExpandedLeadId((prev) =>
-                                prev === entry.lead_id ? null : entry.lead_id,
-                              )
-                            }
-                          >
-                            {expandedLeadId === entry.lead_id
-                              ? "Hide Uploaded Files"
-                              : "View Uploaded Files"}
-                          </button>
-                          <button
-                            type="button"
-                            className="copy-btn"
-                            onClick={() => handleCopyLink(entry.url)}
-                          >
-                            Copy Link
-                          </button>
-                        </div>
-
-                        {expandedLeadId === entry.lead_id ? (
-                          <div className="uploads-panel">
-                            {(leadUploads[entry.lead_id] || []).length === 0 ? (
-                              <div className="uploads-empty">
-                                No files uploaded by this lead yet.
-                              </div>
-                            ) : (
-                              (leadUploads[entry.lead_id] || []).map((file) => (
-                                <div className="uploads-item" key={file.id}>
-                                  <span>{file.file_name}</span>
-                                  <span>
-                                    {file.row_count} rows |{" "}
-                                    {new Date(
-                                      file.uploaded_at,
-                                    ).toLocaleString()}
-                                  </span>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
+          <div className="generated-controls">
+            <div className="filter-group">
+              <span className="filter-label">Department</span>
+              <select
+                className="filter-select"
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+              >
+                {departmentFilterOptions.map((department) => (
+                  <option key={department} value={department}>
+                    {department === "All" ? "All Departments" : department}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="view-toggle">
+              <button
+                type="button"
+                className={`view-toggle-btn ${viewMode === "list" ? "active" : ""}`}
+                onClick={() => setViewMode("list")}
+              >
+                List View
+              </button>
+              <button
+                type="button"
+                className={`view-toggle-btn ${viewMode === "grid" ? "active" : ""}`}
+                onClick={() => setViewMode("grid")}
+              >
+                Grid View
+              </button>
+            </div>
+          </div>
+          {viewMode === "list" ? (
+            filteredDepartments.length === 0 ? (
+              <div className="empty-state">
+                No leads found for this department.
               </div>
-            );
-          })}
+            ) : (
+              filteredDepartments.map((department) => {
+                const theme = getDepartmentTheme(department);
+                const entries = groupedLinks[department] || [];
+                if (entries.length === 0) return null;
+                return (
+                  <div className="department-section" key={department}>
+                    <div
+                      className="department-header"
+                      style={{
+                        background: theme.color.bg,
+                        borderColor: theme.color.border,
+                      }}
+                    >
+                      <span
+                        className="department-badge"
+                        style={{
+                          color: theme.color.text,
+                          borderColor: theme.color.border,
+                          background: "#ffffff",
+                        }}
+                      >
+                        {department}
+                      </span>
+                      <span className="department-meta">
+                        {entries.length} lead{entries.length > 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    <div className="department-links">
+                      {entries.map((entry) => {
+                        const entryTheme = getDepartmentTheme(
+                          entry.lead_department || department,
+                        );
+                        return (
+                          <div className="generated-item" key={entry.id}>
+                            <div className="generated-meta">
+                              <strong>
+                                {entry.lead_username || "Unclaimed lead"}
+                              </strong>
+                              <span
+                                className="department-chip"
+                                style={{
+                                  background: entryTheme.color.bg,
+                                  color: entryTheme.color.text,
+                                  borderColor: entryTheme.color.border,
+                                }}
+                              >
+                                {entry.lead_department || department}
+                              </span>{" "}
+                              | {new Date(entry.created_at).toLocaleString()}
+                              {entry.last_accessed_at
+                                ? ` | Last used: ${new Date(entry.last_accessed_at).toLocaleString()}`
+                                : " | Not used yet"}
+                            </div>
+                            <div className="generated-actions">
+                              <button
+                                type="button"
+                                className="view-btn"
+                                onClick={() =>
+                                  setExpandedLeadId((prev) =>
+                                    prev === entry.lead_id
+                                      ? null
+                                      : entry.lead_id,
+                                  )
+                                }
+                              >
+                                {expandedLeadId === entry.lead_id
+                                  ? "Hide Uploaded Files"
+                                  : "View Uploaded Files"}
+                              </button>
+                              <button
+                                type="button"
+                                className="copy-btn"
+                                onClick={() => handleCopyLink(entry.url)}
+                              >
+                                Copy Link
+                              </button>
+                              <button
+                                type="button"
+                                className="delete-btn"
+                                onClick={() => setPendingDelete(entry)}
+                              >
+                                Delete Lead
+                              </button>
+                            </div>
+
+                            {expandedLeadId === entry.lead_id ? (
+                              <div className="uploads-panel">
+                                {(leadUploads[entry.lead_id] || []).length ===
+                                0 ? (
+                                  <div className="uploads-empty">
+                                    No files uploaded by this lead yet.
+                                  </div>
+                                ) : (
+                                  (leadUploads[entry.lead_id] || []).map(
+                                    (file) => (
+                                      <div
+                                        className="uploads-item"
+                                        key={file.id}
+                                      >
+                                        <span>{file.file_name}</span>
+                                        <span>
+                                          {file.row_count} rows |{" "}
+                                          {new Date(
+                                            file.uploaded_at,
+                                          ).toLocaleString()}
+                                        </span>
+                                      </div>
+                                    ),
+                                  )
+                                )}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })
+            )
+          ) : filteredLinks.length === 0 ? (
+            <div className="empty-state">
+              No leads found for this department.
+            </div>
+          ) : (
+            <div className="generated-grid">
+              {filteredLinks.map((entry) => {
+                const entryTheme = getDepartmentTheme(
+                  entry.lead_department || "General",
+                );
+                return (
+                  <div className="generated-card" key={entry.id}>
+                    <div className="generated-card-head">
+                      <strong>{entry.lead_username || "Unclaimed lead"}</strong>
+                      <span
+                        className="department-chip"
+                        style={{
+                          background: entryTheme.color.bg,
+                          color: entryTheme.color.text,
+                          borderColor: entryTheme.color.border,
+                        }}
+                      >
+                        {entry.lead_department || "General"}
+                      </span>
+                    </div>
+                    <div className="generated-card-meta">
+                      <div>{new Date(entry.created_at).toLocaleString()}</div>
+                      <div>
+                        {entry.last_accessed_at
+                          ? `Last used: ${new Date(entry.last_accessed_at).toLocaleString()}`
+                          : "Not used yet"}
+                      </div>
+                    </div>
+                    <div className="generated-actions">
+                      <button
+                        type="button"
+                        className="view-btn"
+                        onClick={() =>
+                          setExpandedLeadId((prev) =>
+                            prev === entry.lead_id ? null : entry.lead_id,
+                          )
+                        }
+                      >
+                        {expandedLeadId === entry.lead_id
+                          ? "Hide Uploaded Files"
+                          : "View Uploaded Files"}
+                      </button>
+                      <button
+                        type="button"
+                        className="copy-btn"
+                        onClick={() => handleCopyLink(entry.url)}
+                      >
+                        Copy Link
+                      </button>
+                      <button
+                        type="button"
+                        className="delete-btn"
+                        onClick={() => setPendingDelete(entry)}
+                      >
+                        Delete Lead
+                      </button>
+                    </div>
+
+                    {expandedLeadId === entry.lead_id ? (
+                      <div className="uploads-panel">
+                        {(leadUploads[entry.lead_id] || []).length === 0 ? (
+                          <div className="uploads-empty">
+                            No files uploaded by this lead yet.
+                          </div>
+                        ) : (
+                          (leadUploads[entry.lead_id] || []).map((file) => (
+                            <div className="uploads-item" key={file.id}>
+                              <span>{file.file_name}</span>
+                              <span>
+                                {file.row_count} rows |{" "}
+                                {new Date(file.uploaded_at).toLocaleString()}
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {pendingDelete ? (
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <h3 className="modal-title">Confirm lead deletion</h3>
+            <p className="modal-body">
+              Delete{" "}
+              <strong>{pendingDelete.lead_username || "Unclaimed lead"}</strong>
+              {pendingDelete.lead_department
+                ? ` (${pendingDelete.lead_department})`
+                : ""}
+              ? This removes the lead account and access link.
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="modal-btn cancel"
+                onClick={() => setPendingDelete(null)}
+                disabled={deleteLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="modal-btn delete"
+                onClick={() => {
+                  void handleDeleteLead(pendingDelete);
+                }}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? "Deleting..." : "Delete lead"}
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
     </section>

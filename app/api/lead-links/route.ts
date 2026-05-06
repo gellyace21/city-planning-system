@@ -195,3 +195,73 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (
+      !session?.user?.id ||
+      !["admin", "superadmin"].includes(session.user.role)
+    ) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const leadIdParam = request.nextUrl.searchParams.get("leadId");
+    const linkIdParam = request.nextUrl.searchParams.get("linkId");
+    const leadId = Number(leadIdParam);
+    const linkId = Number(linkIdParam);
+
+    if (!Number.isFinite(leadId) && !Number.isFinite(linkId)) {
+      return NextResponse.json(
+        { error: "Lead id or link id is required." },
+        { status: 400 },
+      );
+    }
+
+    const db = await readDb();
+    const links: LeadLink[] = db.generated_links || [];
+
+    let targetLeadId = Number.isFinite(leadId) ? leadId : null;
+    if (!Number.isFinite(leadId) && Number.isFinite(linkId)) {
+      const match = links.find((entry) => entry.id === linkId) || null;
+      if (!match) {
+        return NextResponse.json(
+          { error: "Lead link not found." },
+          { status: 404 },
+        );
+      }
+      targetLeadId = match.lead_id;
+    }
+
+    if (!Number.isFinite(targetLeadId)) {
+      return NextResponse.json(
+        { error: "Lead id is required." },
+        { status: 400 },
+      );
+    }
+
+    const leads: Array<{ id: number }> = db.leads || [];
+    const leadExists = leads.some((entry) => entry.id === targetLeadId);
+    if (!leadExists) {
+      return NextResponse.json(
+        { error: "Lead account not found." },
+        { status: 404 },
+      );
+    }
+
+    db.leads = leads.filter((entry) => entry.id !== targetLeadId);
+    db.generated_links = links.filter(
+      (entry) => entry.lead_id !== targetLeadId,
+    );
+
+    await writeDb(db);
+
+    return NextResponse.json({ ok: true, deletedLeadId: targetLeadId });
+  } catch (error) {
+    console.error("Failed to delete lead link:", error);
+    return NextResponse.json(
+      { error: "Failed to delete lead link" },
+      { status: 500 },
+    );
+  }
+}
