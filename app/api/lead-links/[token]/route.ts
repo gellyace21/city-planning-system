@@ -47,6 +47,8 @@ export async function GET(
       valid: true,
       leadUsername: lead.username || "",
       needsUsername: !lead.username,
+      needsDepartment: !String(lead.department || "").trim(),
+      department: lead.department || "",
     });
   } catch (error) {
     console.error("Failed to validate token:", error);
@@ -65,6 +67,7 @@ export async function POST(
     const { token } = await params;
     const body = await request.json();
     const username = String(body?.username || "").trim();
+    const department = String(body?.department || "").trim();
 
     const db = await readDb();
     const links = db.generated_links || [];
@@ -99,6 +102,13 @@ export async function POST(
       );
     }
 
+    if (!String(lead.department || "").trim() && !department) {
+      return NextResponse.json(
+        { error: "Lead department is required." },
+        { status: 400 },
+      );
+    }
+
     if (username && !lead.username) {
       const existing = (db.leads || []).find(
         (entry: { username: string; id: number }) =>
@@ -116,6 +126,13 @@ export async function POST(
         ...lead,
         username,
         is_active: true,
+      };
+    }
+
+    if (!String(lead.department || "").trim() && department) {
+      db.leads[leadIndex] = {
+        ...db.leads[leadIndex],
+        department,
       };
     }
 

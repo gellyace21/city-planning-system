@@ -14,6 +14,7 @@ export default function ProfileModal({
   adminId,
 }: ProfileModalProps): React.JSX.Element | null {
   const { data: session } = useSession();
+  const isLead = session?.user?.role === "lead";
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -97,7 +98,7 @@ export default function ProfileModal({
     setError("");
 
     try {
-      if (showPassword) {
+      if (!isLead && showPassword) {
         const passwordResponse = await fetch("/api/profile/password", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -325,30 +326,43 @@ export default function ProfileModal({
         .password-controls {
           display: flex;
           align-items: center;
-          justify-content: space-between;
+          justify-content: flex-end;
           gap: 12px;
           flex-wrap: wrap;
         }
 
-        .toggle-password-btn {
-          border: 1px solid #cfe3df;
-          background: #f5fbfa;
-          color: #1a2e2b;
-          border-radius: 6px;
-          padding: 8px 12px;
-          font-size: 0.85rem;
-          font-weight: 600;
-          cursor: pointer;
-          transition:
-            background 0.2s,
-            border-color 0.2s,
-            color 0.2s;
+        .password-input-wrap {
+          position: relative;
         }
 
-        .toggle-password-btn:hover {
-          background: #ebf7f5;
-          border-color: #2a9d8f;
-          color: #16433d;
+        .password-input-wrap input {
+          padding-right: 42px;
+          width: 100%;
+        }
+
+        .password-visibility-btn {
+          position: absolute;
+          top: 50%;
+          right: 8px;
+          transform: translateY(-50%);
+          width: 28px;
+          height: 28px;
+          border: none;
+          background: transparent;
+          color: #5a7a76;
+          border-radius: 6px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition:
+            color 0.2s,
+            background 0.2s;
+        }
+
+        .password-visibility-btn:hover {
+          color: #1a2e2b;
+          background: #eef7f4;
         }
 
         .password-match {
@@ -525,68 +539,208 @@ export default function ProfileModal({
                 placeholder="Email Address"
               />
             </div>
-            <div
-              className="text-blue-500 cursor-pointer font-medium mt-2 mb-4 hover:text-blue-700 transition-colors w-max"
-              role="button"
-              tabIndex={0}
-              onClick={() => setShowPassword((prev) => !prev)}
-            >
-              {showPassword ? "Close Change Password" : "Change Password"}
-            </div>
-            {showPassword ? (
+            {!isLead ? (
               <>
-                <div className="password-controls">
-                  <button
-                    type="button"
-                    className="toggle-password-btn"
-                    onClick={() => setShowPasswordValues((prev) => !prev)}
-                  >
-                    {showPasswordValues ? "Hide Passwords" : "Show Passwords"}
-                  </button>
+                <div
+                  className="text-blue-500 cursor-pointer font-medium mt-2 mb-4 hover:text-blue-700 transition-colors w-max"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setShowPassword((prev) => !prev)}
+                >
+                  {showPassword ? "Close Change Password" : "Change Password"}
+                </div>
+                {showPassword ? (
+                  <>
+                    <div className="password-controls">
+                      {password.length > 0 || confirmPassword.length > 0 ? (
+                        <span
+                          className={`password-match ${passwordsMatch ? "ok" : "not-ok"}`}
+                        >
+                          {passwordsMatch
+                            ? "Passwords match"
+                            : "Passwords do not match"}
+                        </span>
+                      ) : null}
+                    </div>
 
-                  {password.length > 0 || confirmPassword.length > 0 ? (
-                    <span
-                      className={`password-match ${passwordsMatch ? "ok" : "not-ok"}`}
-                    >
-                      {passwordsMatch
-                        ? "Passwords match"
-                        : "Passwords do not match"}
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="currentPassword">Current Password</label>
-                  <input
-                    type={showPasswordValues ? "text" : "password"}
-                    id="currentPassword"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Current Password"
-                  />
-                </div>
-                <div className="flex w-full gap-2 [&>div]:flex-1 [&>div]:min-w-0">
-                  <div className="form-group">
-                    <label htmlFor="newPassword">New Password</label>
-                    <input
-                      type={showPasswordValues ? "text" : "password"}
-                      id="newPassword"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="New Password"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="confirmPassword">Confirm Password</label>
-                    <input
-                      type={showPasswordValues ? "text" : "password"}
-                      id="confirmPassword"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Confirm Password"
-                    />
-                  </div>
-                </div>
+                    <div className="form-group">
+                      <label htmlFor="currentPassword">Current Password</label>
+                      <div className="password-input-wrap">
+                        <input
+                          type={showPasswordValues ? "text" : "password"}
+                          id="currentPassword"
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="Current Password"
+                        />
+                        <button
+                          type="button"
+                          className="password-visibility-btn"
+                          onClick={() => setShowPasswordValues((prev) => !prev)}
+                          aria-label={
+                            showPasswordValues
+                              ? "Hide password"
+                              : "Show password"
+                          }
+                        >
+                          {showPasswordValues ? (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              width="16"
+                              height="16"
+                            >
+                              <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C7 20 2.73 16.11 1 12c.71-1.68 1.79-3.15 3.09-4.31" />
+                              <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c5 0 9.27 3.89 11 8a11.53 11.53 0 0 1-1.67 2.68" />
+                              <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+                              <line x1="1" y1="1" x2="23" y2="23" />
+                            </svg>
+                          ) : (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              width="16"
+                              height="16"
+                            >
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex w-full gap-2 [&>div]:flex-1 [&>div]:min-w-0">
+                      <div className="form-group">
+                        <label htmlFor="newPassword">New Password</label>
+                        <div className="password-input-wrap">
+                          <input
+                            type={showPasswordValues ? "text" : "password"}
+                            id="newPassword"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="New Password"
+                          />
+                          <button
+                            type="button"
+                            className="password-visibility-btn"
+                            onClick={() =>
+                              setShowPasswordValues((prev) => !prev)
+                            }
+                            aria-label={
+                              showPasswordValues
+                                ? "Hide password"
+                                : "Show password"
+                            }
+                          >
+                            {showPasswordValues ? (
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                width="16"
+                                height="16"
+                              >
+                                <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C7 20 2.73 16.11 1 12c.71-1.68 1.79-3.15 3.09-4.31" />
+                                <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c5 0 9.27 3.89 11 8a11.53 11.53 0 0 1-1.67 2.68" />
+                                <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+                                <line x1="1" y1="1" x2="23" y2="23" />
+                              </svg>
+                            ) : (
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                width="16"
+                                height="16"
+                              >
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
+                                <circle cx="12" cy="12" r="3" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="confirmPassword">
+                          Confirm Password
+                        </label>
+                        <div className="password-input-wrap">
+                          <input
+                            type={showPasswordValues ? "text" : "password"}
+                            id="confirmPassword"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="Confirm Password"
+                          />
+                          <button
+                            type="button"
+                            className="password-visibility-btn"
+                            onClick={() =>
+                              setShowPasswordValues((prev) => !prev)
+                            }
+                            aria-label={
+                              showPasswordValues
+                                ? "Hide password"
+                                : "Show password"
+                            }
+                          >
+                            {showPasswordValues ? (
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                width="16"
+                                height="16"
+                              >
+                                <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C7 20 2.73 16.11 1 12c.71-1.68 1.79-3.15 3.09-4.31" />
+                                <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c5 0 9.27 3.89 11 8a11.53 11.53 0 0 1-1.67 2.68" />
+                                <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+                                <line x1="1" y1="1" x2="23" y2="23" />
+                              </svg>
+                            ) : (
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                width="16"
+                                height="16"
+                              >
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
+                                <circle cx="12" cy="12" r="3" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : null}
               </>
             ) : null}
 

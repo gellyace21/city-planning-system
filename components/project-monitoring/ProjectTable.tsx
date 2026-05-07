@@ -48,9 +48,11 @@ import {
   IconTrash,
 } from "@tabler/icons-react";
 import { downloadAIP, parseAIPExcel } from "@/lib/aipExport";
+import { downloadMonitoringTemplateMapped } from "@/lib/monitoringExport";
 import { useSession } from "next-auth/react";
 
 type ActiveDataset = "aip" | "monitoring";
+type StatusTab = "all" | "submitted" | "draft";
 
 type ChangeOperation = {
   dataset: ActiveDataset;
@@ -91,6 +93,120 @@ const toYear = (value: string): number | null => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
 
+const DATE_INPUT_RE =
+  /^(\d{4}-\d{2}-\d{2}|[A-Za-z]{3,9}\s+\d{4}|[A-Za-z]{3,9}\s+\d{1,2},\s*\d{4})$/;
+
+const isValidDateInput = (value: string): boolean => {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  return DATE_INPUT_RE.test(trimmed);
+};
+
+const normalizeCode = (value: string): string => value.trim().toLowerCase();
+
+const getAipClientIssues = (
+  row: AIPRow,
+  allRows: AIPRow[],
+  submittedUploadIds: Set<number>,
+): string[] => {
+  if (row.upload_id && submittedUploadIds.has(row.upload_id)) {
+    return [];
+  }
+
+  const issues: string[] = [];
+  const requiredFields: (keyof AIPRow)[] = [
+    "aipCode",
+    "description",
+    "department",
+    "startDate",
+    "endDate",
+    "outputs",
+    "funding",
+  ];
+
+  for (const field of requiredFields) {
+    if (!String(row[field] ?? "").trim()) {
+      issues.push(`${String(field)} is required`);
+    }
+  }
+
+  if (row.startDate && !isValidDateInput(row.startDate)) {
+    issues.push("invalid start date format");
+  }
+  if (row.endDate && !isValidDateInput(row.endDate)) {
+    issues.push("invalid end date format");
+  }
+
+  const duplicateCode =
+    normalizeCode(row.aipCode).length > 0 &&
+    allRows.some(
+      (item) =>
+        item.id !== row.id &&
+        normalizeCode(item.aipCode) === normalizeCode(row.aipCode),
+    );
+  if (duplicateCode) {
+    issues.push("duplicate AIP code");
+  }
+
+  for (const numeric of [
+    row.ps,
+    row.mooe,
+    row.fe,
+    row.co,
+    row.total,
+    row.ccAdaptation,
+    row.ccMitigation,
+  ]) {
+    if (!Number.isFinite(numeric) || numeric < 0) {
+      issues.push("budget values must be non-negative numbers");
+      break;
+    }
+  }
+
+  return issues;
+};
+
+const getMonitoringClientIssues = (row: MonitoringRow): string[] => {
+  const issues: string[] = [];
+  for (const field of [
+    "project_name",
+    "agency",
+    "location",
+    "funding",
+    "certified_date",
+  ] as const) {
+    if (!String(row[field] ?? "").trim()) {
+      issues.push(`${field} is required`);
+    }
+  }
+
+  if (row.certified_date && !isValidDateInput(row.certified_date)) {
+    issues.push("invalid certified date format");
+  }
+
+  for (const numeric of [
+    row.approved_budget,
+    row.certified_amount,
+    row.obligation,
+    row.actual_cost,
+  ]) {
+    if (!Number.isFinite(numeric) || numeric < 0) {
+      issues.push("budget values must be non-negative numbers");
+      break;
+    }
+  }
+
+  if (
+    !Number.isFinite(row.status_percent) ||
+    row.status_percent < 0 ||
+    row.status_percent > 100
+  ) {
+    issues.push("status % must be between 0 and 100");
+  }
+
+  return issues;
+};
+
 const makeInitials = (name: string): string => {
   const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
   if (parts.length === 0) return "U";
@@ -111,7 +227,11 @@ export default function ProjectTable({
 
   const [busy, setBusy] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>("");
+  const [infoMsg, setInfoMsg] = useState<string>("");
   const [showHistory, setShowHistory] = useState<boolean>(false);
+  const [compareEntry, setCompareEntry] = useState<EditHistoryEntry | null>(
+    null,
+  );
   const [history, setHistory] = useState<EditHistoryEntry[]>(initialHistory);
   const [leadFiles, setLeadFiles] = useState<LeadFileSummary[]>([]);
   const [uploadingFile, setUploadingFile] = useState<boolean>(false);
@@ -140,6 +260,7 @@ export default function ProjectTable({
   const historyPanelRef = useRef<HTMLDivElement | null>(null);
 
   const [aipRows, setAipRows] = useState<AIPRow[]>(initialAipRows);
+  const [aipStatusTab, setAipStatusTab] = useState<StatusTab>("all");
   const [aipSearch, setAipSearch] = useState<string>("");
   const [aipSector, setAipSector] = useState<string>("All");
   const [aipDepartment, setAipDepartment] = useState<string>("All");
@@ -156,6 +277,8 @@ export default function ProjectTable({
   const [monitoringRows, setMonitoringRows] = useState<MonitoringRow[]>(
     initialMonitoringRows,
   );
+  const [monitoringStatusTab, setMonitoringStatusTab] =
+    useState<StatusTab>("all");
   const [monitoringSearch, setMonitoringSearch] = useState<string>("");
   const [monitoringYear, setMonitoringYear] = useState<string>("All");
   const [monitoringSortCol, setMonitoringSortCol] =
@@ -169,6 +292,11 @@ export default function ProjectTable({
   const [monitoringEditValue, setMonitoringEditValue] = useState<string>("");
 
   const entityName = mode === "aip" ? "aip_rows" : "monitoring_rows";
+  const autosaveKey = useMemo(
+    () =>
+      `project-table-autosave:${mode}:${session?.user?.id ?? "anonymous"}:${session?.user?.role ?? "unknown"}`,
+    [mode, session?.user?.id, session?.user?.role],
+  );
 
   const commentFields = useMemo(() => {
     if (mode === "aip") {
@@ -266,6 +394,51 @@ export default function ProjectTable({
     return leadFiles.find((file) => file.id === selectedUploadId) || null;
   }, [leadFiles, selectedUploadId]);
 
+  const submittedUploadIds = useMemo(() => {
+    return new Set(
+      leadFiles
+        .filter((file) => file.is_submitted || file.submitted_at)
+        .map((file) => file.id),
+    );
+  }, [leadFiles]);
+
+  const aipIssueMap = useMemo(() => {
+    return new Map(
+      aipRows.map((row) => [
+        row.id,
+        getAipClientIssues(row, aipRows, submittedUploadIds),
+      ]),
+    );
+  }, [aipRows, submittedUploadIds]);
+
+  const monitoringIssueMap = useMemo(() => {
+    return new Map(
+      monitoringRows.map((row) => [row.id, getMonitoringClientIssues(row)]),
+    );
+  }, [monitoringRows]);
+
+  const aipStatusCounts = useMemo(() => {
+    let submitted = 0;
+    let draft = 0;
+    for (const row of visibleAipRows) {
+      const issues = aipIssueMap.get(row.id) ?? [];
+      if (issues.length === 0) submitted += 1;
+      else draft += 1;
+    }
+    return { submitted, draft };
+  }, [visibleAipRows, aipIssueMap]);
+
+  const monitoringStatusCounts = useMemo(() => {
+    let submitted = 0;
+    let draft = 0;
+    for (const row of monitoringRows) {
+      const issues = monitoringIssueMap.get(row.id) ?? [];
+      if (issues.length === 0) submitted += 1;
+      else draft += 1;
+    }
+    return { submitted, draft };
+  }, [monitoringRows, monitoringIssueMap]);
+
   const isLeadRowLocked = (rowId: number): boolean => {
     if (!isLead) return false;
     const row = aipRows.find((item) => item.id === rowId);
@@ -299,6 +472,13 @@ export default function ProjectTable({
 
   const filteredAip = useMemo(() => {
     return visibleAipRows
+      .filter((row) => {
+        if (aipStatusTab === "all") return true;
+        const issues = aipIssueMap.get(row.id) ?? [];
+        return aipStatusTab === "submitted"
+          ? issues.length === 0
+          : issues.length > 0;
+      })
       .filter((row) => aipSector === "All" || row.sector === aipSector)
       .filter((row) =>
         aipDepartment === "All" ? true : row.department === aipDepartment,
@@ -340,10 +520,19 @@ export default function ProjectTable({
     aipSortCol,
     aipSortDir,
     selectedUploadId,
+    aipStatusTab,
+    aipIssueMap,
   ]);
 
   const filteredMonitoring = useMemo(() => {
     return monitoringRows
+      .filter((row) => {
+        if (monitoringStatusTab === "all") return true;
+        const issues = monitoringIssueMap.get(row.id) ?? [];
+        return monitoringStatusTab === "submitted"
+          ? issues.length === 0
+          : issues.length > 0;
+      })
       .filter((row) => {
         const resolvedYear = row.year || toYear(row.certified_date || "");
         return monitoringYear === "All"
@@ -381,6 +570,8 @@ export default function ProjectTable({
     monitoringSearch,
     monitoringSortCol,
     monitoringSortDir,
+    monitoringStatusTab,
+    monitoringIssueMap,
   ]);
 
   const leadCellStatuses = useMemo(() => {
@@ -534,7 +725,111 @@ export default function ProjectTable({
     })();
   }, [session?.user?.id, session?.user?.role]);
 
+  useEffect(() => {
+    if (!session?.user) return;
+    try {
+      const raw = window.localStorage.getItem(autosaveKey);
+      if (!raw) return;
+      const snapshot = JSON.parse(raw) as {
+        aipEditCell?: EditCell;
+        aipEditValue?: string;
+        monitoringEditCell?: MonitoringEditCell;
+        monitoringEditValue?: string;
+        aipSearch?: string;
+        monitoringSearch?: string;
+        aipYear?: string;
+        monitoringYear?: string;
+        selectedUploadId?: number | "all";
+        aipStatusTab?: StatusTab;
+        monitoringStatusTab?: StatusTab;
+      };
+
+      if (snapshot.aipEditCell) setAipEditCell(snapshot.aipEditCell);
+      if (typeof snapshot.aipEditValue === "string") {
+        setAipEditValue(snapshot.aipEditValue);
+      }
+      if (snapshot.monitoringEditCell) {
+        setMonitoringEditCell(snapshot.monitoringEditCell);
+      }
+      if (typeof snapshot.monitoringEditValue === "string") {
+        setMonitoringEditValue(snapshot.monitoringEditValue);
+      }
+      if (typeof snapshot.aipSearch === "string")
+        setAipSearch(snapshot.aipSearch);
+      if (typeof snapshot.monitoringSearch === "string") {
+        setMonitoringSearch(snapshot.monitoringSearch);
+      }
+      if (typeof snapshot.aipYear === "string") setAipYear(snapshot.aipYear);
+      if (typeof snapshot.monitoringYear === "string") {
+        setMonitoringYear(snapshot.monitoringYear);
+      }
+      if (
+        snapshot.selectedUploadId === "all" ||
+        typeof snapshot.selectedUploadId === "number"
+      ) {
+        setSelectedUploadId(snapshot.selectedUploadId);
+      }
+      if (
+        snapshot.aipStatusTab === "all" ||
+        snapshot.aipStatusTab === "submitted" ||
+        snapshot.aipStatusTab === "draft"
+      ) {
+        setAipStatusTab(snapshot.aipStatusTab);
+      }
+      if (
+        snapshot.monitoringStatusTab === "all" ||
+        snapshot.monitoringStatusTab === "submitted" ||
+        snapshot.monitoringStatusTab === "draft"
+      ) {
+        setMonitoringStatusTab(snapshot.monitoringStatusTab);
+      }
+      setInfoMsg("Recovered your unsaved table workspace from local autosave.");
+    } catch {
+      // Ignore malformed local autosave payloads.
+    }
+  }, [autosaveKey, session?.user]);
+
+  useEffect(() => {
+    if (!session?.user) return;
+
+    const payload = {
+      aipEditCell,
+      aipEditValue,
+      monitoringEditCell,
+      monitoringEditValue,
+      aipSearch,
+      monitoringSearch,
+      aipYear,
+      monitoringYear,
+      selectedUploadId,
+      aipStatusTab,
+      monitoringStatusTab,
+      savedAt: new Date().toISOString(),
+    };
+
+    try {
+      window.localStorage.setItem(autosaveKey, JSON.stringify(payload));
+    } catch {
+      // Ignore storage quota errors.
+    }
+  }, [
+    autosaveKey,
+    session?.user,
+    aipEditCell,
+    aipEditValue,
+    monitoringEditCell,
+    monitoringEditValue,
+    aipSearch,
+    monitoringSearch,
+    aipYear,
+    monitoringYear,
+    selectedUploadId,
+    aipStatusTab,
+    monitoringStatusTab,
+  ]);
+
   const handleFailure = (error: unknown): void => {
+    setInfoMsg("");
     setErrorMsg(
       error instanceof Error ? error.message : "Failed to save changes.",
     );
@@ -978,7 +1273,11 @@ export default function ProjectTable({
       setAipRows(refreshed.aipRows);
       setMonitoringRows(refreshed.monitoringRows);
       setHistory(refreshed.history);
+      setCompareEntry(null);
       setErrorMsg("");
+      setInfoMsg(
+        "History restored. You can compare again before the next restore.",
+      );
     } catch (error) {
       handleFailure(error);
     } finally {
@@ -1144,44 +1443,23 @@ export default function ProjectTable({
     });
   };
 
-  const exportMonitoringCsv = (): void => {
-    const headers = [
-      "project_name",
-      "agency",
-      "location",
-      "approved_budget",
-      "certified_amount",
-      "obligation",
-      "actual_cost",
-      "funding",
-      "certified_date",
-      "major_findings",
-      "issues",
-      "status_percent",
-      "action_recommendation",
-      "remarks",
-    ] as const;
+  const exportMonitoring = (): void => {
+    downloadMonitoringTemplateMapped(
+      filteredMonitoring,
+      `monitoring_${monitoringYear === "All" ? "all-years" : monitoringYear}.xlsx`,
+      {
+        fallbackToCsv: true,
+      },
+    );
+  };
 
-    const lines = [headers.join(",")];
-    for (const row of filteredMonitoring) {
-      const cells = headers.map((header) => {
-        const raw = String(row[header] ?? "").replaceAll('"', '""');
-        return `\"${raw}\"`;
-      });
-      lines.push(cells.join(","));
+  const getSnapshotText = (entry: EditHistoryEntry): string => {
+    if (!entry.row_snapshot) return "";
+    try {
+      return JSON.stringify(JSON.parse(entry.row_snapshot), null, 2);
+    } catch {
+      return entry.row_snapshot;
     }
-
-    const blob = new Blob([lines.join("\n")], {
-      type: "text/csv;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `monitoring_${
-      monitoringYear === "All" ? "all-years" : monitoringYear
-    }.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -1255,6 +1533,12 @@ export default function ProjectTable({
           </div>
         )}
 
+        {infoMsg && (
+          <div className="px-4 py-2 rounded-lg text-sm text-sky-700 bg-sky-50 border border-sky-200">
+            {infoMsg}
+          </div>
+        )}
+
         {isAdmin && (
           <div
             ref={historyPanelRef}
@@ -1304,6 +1588,12 @@ export default function ProjectTable({
                       </span>
                     </div>
                     <div className="mt-2 flex items-center gap-3 text-xs font-semibold">
+                      <button
+                        onClick={() => setCompareEntry(entry)}
+                        className="text-violet-700 hover:underline"
+                      >
+                        Compare
+                      </button>
                       {entry.entity_name === "aip_rows" && (
                         <button
                           onClick={() => jumpToAipChange(entry)}
@@ -1445,7 +1735,7 @@ export default function ProjectTable({
                                             ).toLocaleString()}
                                           </div>
                                         </div>
-                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                        <div className="flex items-center gap-2 shrink-0">
                                           <button
                                             type="button"
                                             className="px-2 py-1 rounded bg-white border border-gray-200 text-[11px] font-semibold text-sky-700 hover:bg-sky-50"
@@ -1509,7 +1799,7 @@ export default function ProjectTable({
                               </span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="flex items-center gap-2 shrink-0">
                             {!(file.is_submitted || file.submitted_at) ? (
                               <button
                                 type="button"
@@ -1562,6 +1852,28 @@ export default function ProjectTable({
             )}
 
             <div className="flex flex-wrap gap-2 items-center">
+              <div className="inline-flex items-center rounded-lg border border-gray-200 bg-white p-1">
+                {(
+                  [
+                    ["all", `All (${visibleAipRows.length})`],
+                    ["submitted", `Submitted (${aipStatusCounts.submitted})`],
+                    ["draft", `Draft (${aipStatusCounts.draft})`],
+                  ] as const
+                ).map(([tab, label]) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setAipStatusTab(tab)}
+                    className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                      aipStatusTab === tab
+                        ? "bg-sky-600 text-white"
+                        : "text-gray-700 hover:bg-sky-50"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               <input
                 value={aipSearch}
                 onChange={(e) => setAipSearch(e.target.value)}
@@ -1657,6 +1969,31 @@ export default function ProjectTable({
         ) : (
           <>
             <div className="flex flex-wrap gap-2 items-center">
+              <div className="inline-flex items-center rounded-lg border border-gray-200 bg-white p-1">
+                {(
+                  [
+                    ["all", `All (${monitoringRows.length})`],
+                    [
+                      "submitted",
+                      `Submitted (${monitoringStatusCounts.submitted})`,
+                    ],
+                    ["draft", `Draft (${monitoringStatusCounts.draft})`],
+                  ] as const
+                ).map(([tab, label]) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setMonitoringStatusTab(tab)}
+                    className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                      monitoringStatusTab === tab
+                        ? "bg-emerald-600 text-white"
+                        : "text-gray-700 hover:bg-emerald-50"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               <input
                 value={monitoringSearch}
                 onChange={(e) => setMonitoringSearch(e.target.value)}
@@ -1678,10 +2015,10 @@ export default function ProjectTable({
                 Comments: {scopedComments.length}
               </span>
               <button
-                onClick={exportMonitoringCsv}
+                onClick={exportMonitoring}
                 className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold"
               >
-                Export CSV
+                Export XLSX
               </button>
               <button
                 onClick={() => {
@@ -1726,6 +2063,94 @@ export default function ProjectTable({
           </>
         )}
       </div>
+
+      {compareEntry && (
+        <div
+          className="fixed inset-0 bg-black/30 z-30 flex items-center justify-center p-4"
+          onClick={() => setCompareEntry(null)}
+        >
+          <div
+            className="w-full max-w-3xl bg-white rounded-2xl border border-gray-200 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">
+                  Compare Version Before Restore
+                </h3>
+                <p className="text-xs text-gray-500">
+                  {compareEntry.entity_name === "aip_rows"
+                    ? "AIP"
+                    : "Monitoring"}{" "}
+                  row {compareEntry.row_id} · field {compareEntry.column_name}
+                </p>
+              </div>
+              <button
+                onClick={() => setCompareEntry(null)}
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+                  <p className="text-xs font-semibold uppercase text-red-700">
+                    Old Value
+                  </p>
+                  <p className="text-sm text-red-900 whitespace-pre-wrap wrap-break-word mt-1">
+                    {compareEntry.old_value === null
+                      ? "(empty)"
+                      : String(compareEntry.old_value)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                  <p className="text-xs font-semibold uppercase text-emerald-700">
+                    New Value
+                  </p>
+                  <p className="text-sm text-emerald-900 whitespace-pre-wrap wrap-break-word mt-1">
+                    {compareEntry.new_value === null
+                      ? "(empty)"
+                      : String(compareEntry.new_value)}
+                  </p>
+                </div>
+              </div>
+
+              {compareEntry.row_snapshot ? (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                  <p className="text-xs font-semibold uppercase text-gray-700 mb-2">
+                    Saved Row Snapshot
+                  </p>
+                  <pre className="text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap wrap-break-word">
+                    {getSnapshotText(compareEntry)}
+                  </pre>
+                </div>
+              ) : null}
+
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCompareEntry(null)}
+                  className="px-3 py-2 rounded-lg text-sm font-semibold border border-gray-200 text-gray-700 bg-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void restoreHistory(compareEntry);
+                  }}
+                  disabled={busy}
+                  className="px-3 py-2 rounded-lg text-sm font-semibold bg-amber-600 text-white disabled:opacity-50"
+                >
+                  {busy ? "Restoring..." : "Restore This Version"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {commentTarget && (
         <div

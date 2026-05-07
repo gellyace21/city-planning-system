@@ -196,6 +196,132 @@ const MONITORING_NUMERIC_FIELDS = new Set<keyof MonitoringRow>([
   "status_percent",
 ]);
 
+const AIP_REQUIRED_FIELDS: (keyof AIPRow)[] = [
+  "aipCode",
+  "description",
+  "department",
+  "startDate",
+  "endDate",
+  "outputs",
+  "funding",
+];
+
+const MONITORING_REQUIRED_FIELDS: (keyof MonitoringRow)[] = [
+  "project_name",
+  "agency",
+  "location",
+  "funding",
+  "certified_date",
+];
+
+const DATE_INPUT_RE =
+  /^(\d{4}-\d{2}-\d{2}|[A-Za-z]{3,9}\s+\d{4}|[A-Za-z]{3,9}\s+\d{1,2},\s*\d{4})$/;
+
+const isValidDateInput = (value: string): boolean => {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  return DATE_INPUT_RE.test(trimmed);
+};
+
+const normalizeCode = (value: string): string => value.trim().toLowerCase();
+
+const assertValidNumberField = (
+  field: string,
+  value: string | number,
+  options?: { max?: number },
+): number => {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`${field} must be a valid number.`);
+  }
+  if (parsed < 0) {
+    throw new Error(`${field} cannot be negative.`);
+  }
+  if (
+    typeof options?.max === "number" &&
+    Number.isFinite(options.max) &&
+    parsed > options.max
+  ) {
+    throw new Error(`${field} cannot be greater than ${options.max}.`);
+  }
+  return parsed;
+};
+
+const validateAipRowForSubmission = (
+  row: RawAIPRow,
+  allRows: RawAIPRow[],
+): string[] => {
+  const issues: string[] = [];
+
+  for (const field of AIP_REQUIRED_FIELDS) {
+    const value = String(row[field] ?? "").trim();
+    if (!value) {
+      issues.push(`${String(field)} is required`);
+    }
+  }
+
+  if (row.startDate && !isValidDateInput(String(row.startDate))) {
+    issues.push("startDate has an invalid format");
+  }
+  if (row.endDate && !isValidDateInput(String(row.endDate))) {
+    issues.push("endDate has an invalid format");
+  }
+
+  for (const numericField of AIP_NUMERIC_FIELDS) {
+    const parsed = Number(row[numericField]);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      issues.push(`${String(numericField)} must be a non-negative number`);
+    }
+  }
+
+  const code = normalizeCode(String(row.aipCode ?? ""));
+  if (code) {
+    const duplicateCount = allRows.filter(
+      (item) =>
+        item.id !== row.id &&
+        normalizeCode(String(item.aipCode ?? "")) === code,
+    ).length;
+    if (duplicateCount > 0) {
+      issues.push("aipCode is duplicated");
+    }
+  }
+
+  return issues;
+};
+
+const validateMonitoringRow = (row: RawMonitoringRow): string[] => {
+  const issues: string[] = [];
+
+  for (const field of MONITORING_REQUIRED_FIELDS) {
+    const value = String(row[field] ?? "").trim();
+    if (!value) {
+      issues.push(`${String(field)} is required`);
+    }
+  }
+
+  if (row.certified_date && !isValidDateInput(String(row.certified_date))) {
+    issues.push("certified_date has an invalid format");
+  }
+
+  for (const field of MONITORING_NUMERIC_FIELDS) {
+    const max = field === "status_percent" ? 100 : undefined;
+    const parsed = Number(row[field]);
+    if (
+      !Number.isFinite(parsed) ||
+      parsed < 0 ||
+      (max !== undefined && parsed > max)
+    ) {
+      issues.push(
+        max === undefined
+          ? `${String(field)} must be a non-negative number`
+          : `${String(field)} must be between 0 and ${max}`,
+      );
+    }
+  }
+
+  return issues;
+};
+
 const toNumber = (value: unknown): number => {
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -559,7 +685,19 @@ const normalizeAipValue = (
   field: keyof AIPRow,
   value: string | number,
 ): string | number => {
-  return AIP_NUMERIC_FIELDS.has(field) ? toNumber(value) : String(value ?? "");
+  if (AIP_NUMERIC_FIELDS.has(field)) {
+    return assertValidNumberField(String(field), value);
+  }
+
+  const text = String(value ?? "");
+  if ((field === "startDate" || field === "endDate") && text.trim()) {
+    if (!isValidDateInput(text)) {
+      throw new Error(
+        `${String(field)} must use YYYY-MM-DD, MMM YYYY, or Month DD, YYYY format.`,
+      );
+    }
+  }
+  return text;
 };
 
 const restoreAipSnapshot = (
@@ -1002,8 +1140,18 @@ export async function updateMonitoringRowField(
   const row = { ...rows[idx] };
   const oldValue = row[field];
   const parsed = MONITORING_NUMERIC_FIELDS.has(field)
-    ? toNumber(value)
+    ? assertValidNumberField(String(field), value, {
+        max: field === "status_percent" ? 100 : undefined,
+      })
     : String(value ?? "");
+
+  if (field === "certified_date" && String(parsed).trim()) {
+    if (!isValidDateInput(String(parsed))) {
+      throw new Error(
+        "certified_date must use YYYY-MM-DD, MMM YYYY, or Month DD, YYYY format.",
+      );
+    }
+  }
 
   if (String(oldValue) === String(parsed)) {
     return { row: toMonitoringRow(row), historyEntry: null };
@@ -1101,6 +1249,27 @@ export async function uploadLeadAipRows(
   const db = await readDb();
   const leadFiles = getLeadFiles(db);
   const aipRows = getAipRows(db);
+  const existingCodes = new Set(
+    aipRows
+      .map((row) => normalizeCode(String(row.aipCode ?? "")))
+      .filter(Boolean),
+  );
+
+  const seenUploadCodes = new Set<string>();
+  for (const row of cleanedRows) {
+    const code = normalizeCode(String(row.aipCode ?? ""));
+    if (!code) continue;
+    if (seenUploadCodes.has(code)) {
+      throw new Error(
+        `Duplicate AIP code found in uploaded file: ${row.aipCode}`,
+      );
+    }
+    if (existingCodes.has(code)) {
+      throw new Error(`AIP code already exists: ${row.aipCode}`);
+    }
+    seenUploadCodes.add(code);
+  }
+
   const lead = getLeads(db).find((item) => toNumber(item.id) === actor.id);
   const leadDepartment = toStringSafe(lead?.department) || "General";
 
@@ -1255,6 +1424,28 @@ export async function submitLeadUpload(
 
   if (file.is_submitted) {
     return toLeadFileSummary(file);
+  }
+
+  const aipRows = getAipRows(db).filter((row) => row.upload_id === fileId);
+  if (aipRows.length === 0) {
+    throw new Error("Cannot submit an empty file.");
+  }
+
+  const allRows = getAipRows(db);
+  const issues: string[] = [];
+  for (const row of aipRows) {
+    const rowIssues = validateAipRowForSubmission(row, allRows);
+    if (rowIssues.length > 0) {
+      issues.push(`Row ${row.id}: ${rowIssues.join(", ")}`);
+    }
+  }
+
+  if (issues.length > 0) {
+    throw new Error(
+      `Submission blocked. Please fix these issues first:\n${issues
+        .slice(0, 12)
+        .join("\n")}`,
+    );
   }
 
   const submittedAt = new Date().toISOString();

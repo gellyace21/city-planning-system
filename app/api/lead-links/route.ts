@@ -14,6 +14,7 @@ type LeadLink = {
   created_at: string;
   last_accessed_at?: string;
   lead_department?: string;
+  lead_profile_pic?: string;
 };
 
 type LeadFile = {
@@ -60,8 +61,12 @@ export async function GET(request: NextRequest) {
     const db = await readDb();
     const links: LeadLink[] = db.generated_links || [];
     const leadFiles: LeadFile[] = (db.lead_files || []) as LeadFile[];
-    const leads: Array<{ id: number; username: string; department?: string }> =
-      db.leads || [];
+    const leads: Array<{
+      id: number;
+      username: string;
+      department?: string;
+      profile_pic?: string;
+    }> = db.leads || [];
     const leadById = new Map(leads.map((lead) => [Number(lead.id), lead]));
     const origin = request.nextUrl.origin;
 
@@ -74,6 +79,7 @@ export async function GET(request: NextRequest) {
           lead_username:
             lead?.username || link.lead_username || `Lead ${link.lead_id}`,
           lead_department: lead?.department || "General",
+          lead_profile_pic: lead?.profile_pic || "",
           url: `${origin}/lead-access/${link.token}`,
         };
       });
@@ -115,7 +121,6 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const leadUsername = String(body?.leadUsername || "").trim();
-    const leadDepartment = String(body?.department || "General").trim();
     const hasLeadUsername = Boolean(leadUsername);
 
     const db = await readDb();
@@ -139,7 +144,7 @@ export async function POST(request: NextRequest) {
         username: leadUsername || "",
         password_hash: "",
         is_active: true,
-        department: leadDepartment || "General",
+        department: "",
         created_at: new Date().toISOString(),
       };
       db.leads.push(lead);
@@ -160,6 +165,7 @@ export async function POST(request: NextRequest) {
         link: {
           ...existing,
           lead_department: lead?.department || "General",
+          lead_profile_pic: lead?.profile_pic || "",
           url: `${origin}/lead-access/${existing.token}`,
           reused: true,
         },
@@ -184,6 +190,7 @@ export async function POST(request: NextRequest) {
       link: {
         ...newLink,
         lead_department: lead?.department || "General",
+        lead_profile_pic: lead?.profile_pic || "",
         url: `${origin}/lead-access/${newLink.token}`,
       },
     });

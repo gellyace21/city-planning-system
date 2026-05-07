@@ -16,5 +16,6 @@ export interface Lead {
   password_hash: string;
   is_active: boolean;
   department: string;
+  profile_pic?: string;
   created_at: string;
 }

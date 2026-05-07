@@ -8,6 +8,7 @@ type GeneratedLink = {
   id: number;
   lead_id: number;
   lead_username: string;
+  lead_profile_pic?: string;
   token: string;
   created_at: string;
   last_accessed_at?: string;
@@ -26,8 +27,6 @@ type LeadUploadedFile = {
   lead_department?: string;
 };
 
-const CUSTOM_DEPARTMENT_VALUE = "__custom__";
-
 export default function LeadLinksManager(): React.JSX.Element | null {
   const { data: session, status } = useSession();
   const isAdminView = ["admin", "superadmin"].includes(
@@ -35,9 +34,6 @@ export default function LeadLinksManager(): React.JSX.Element | null {
   );
 
   const [linkValue, setLinkValue] = useState("");
-
-  const [selectedDepartment, setSelectedDepartment] = useState("General");
-  const [customDepartment, setCustomDepartment] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("All");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [generatedLinks, setGeneratedLinks] = useState<GeneratedLink[]>([]);
@@ -78,13 +74,6 @@ export default function LeadLinksManager(): React.JSX.Element | null {
     return [...ordered, ...extras];
   }, [groupedLinks]);
 
-  const resolvedLeadDepartment = useMemo(() => {
-    if (selectedDepartment === CUSTOM_DEPARTMENT_VALUE) {
-      return customDepartment.trim() || "General";
-    }
-    return selectedDepartment.trim() || "General";
-  }, [customDepartment, selectedDepartment]);
-
   const departmentFilterOptions = useMemo(
     () => ["All", ...groupedDepartments],
     [groupedDepartments],
@@ -102,11 +91,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
     });
   }, [generatedLinks, departmentFilter]);
 
-  const canGenerate =
-    isAdminView &&
-    !linkLoading &&
-    (selectedDepartment !== CUSTOM_DEPARTMENT_VALUE ||
-      Boolean(customDepartment.trim()));
+  const canGenerate = isAdminView && !linkLoading;
 
   const fetchLinks = async () => {
     if (!isAdminView) return;
@@ -163,23 +148,12 @@ export default function LeadLinksManager(): React.JSX.Element | null {
     setLinkError("");
     setLinkMessage("");
 
-    if (
-      selectedDepartment === CUSTOM_DEPARTMENT_VALUE &&
-      !customDepartment.trim()
-    ) {
-      setLinkError("Please enter a custom department.");
-      setLinkLoading(false);
-      return;
-    }
-
     try {
       const response = await fetch("/api/lead-links", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({
-          department: resolvedLeadDepartment,
-        }),
+        body: JSON.stringify({}),
       });
 
       const data = await response.json();
@@ -249,8 +223,6 @@ export default function LeadLinksManager(): React.JSX.Element | null {
 
   const handleRefresh = () => {
     setLinkValue("");
-    setSelectedDepartment("General");
-    setCustomDepartment("");
     setLinkMessage("");
     setLinkError("");
   };
@@ -318,12 +290,19 @@ export default function LeadLinksManager(): React.JSX.Element | null {
           border: none;
           border-radius: 8px;
           padding: 0 14px;
-          background: linear-gradient(90deg, #3d8f6e 0%, #55b38a 100%);
+          // background: linear-gradient(90deg, #3d8f6e 0%, #55b38a 100%);
+          background: var(--primary);
           color: #ffffff;
           font-size: 12px;
-          font-weight: 700;
+          // font-weight: 700;
+          font-weight: bold;
           letter-spacing: 0.4px;
           cursor: pointer;
+          transition: 0.2s;
+        }
+
+        .generate-btn:hover {
+          filter: brightness(0.9);
         }
 
         .generate-btn:disabled {
@@ -341,7 +320,8 @@ export default function LeadLinksManager(): React.JSX.Element | null {
         }
 
         .link-label {
-          background: linear-gradient(90deg, #a8c8a0 0%, #8dbf84 100%);
+          // background: linear-gradient(90deg, #a8c8a0 0%, #8dbf84 100%);
+          background: var(--primary);
           color: #ffffff;
           padding: 8px 18px;
           font-size: 12px;
@@ -738,27 +718,6 @@ export default function LeadLinksManager(): React.JSX.Element | null {
       `}</style>
 
       <div className="lead-row">
-        <select
-          className="lead-input"
-          value={selectedDepartment}
-          onChange={(e) => setSelectedDepartment(e.target.value)}
-        >
-          {departmentOptions.map((department) => (
-            <option key={department} value={department}>
-              {department}
-            </option>
-          ))}
-          <option value={CUSTOM_DEPARTMENT_VALUE}>Custom...</option>
-        </select>
-        {selectedDepartment === CUSTOM_DEPARTMENT_VALUE ? (
-          <input
-            type="text"
-            className="lead-input custom-input"
-            placeholder="Custom department"
-            value={customDepartment}
-            onChange={(e) => setCustomDepartment(e.target.value)}
-          />
-        ) : null}
         <div className="link-row">
           <div className="link-combined">
             <span className="link-label">LINK</span>
@@ -900,9 +859,24 @@ export default function LeadLinksManager(): React.JSX.Element | null {
                         return (
                           <div className="generated-item" key={entry.id}>
                             <div className="generated-meta">
-                              <strong>
-                                {entry.lead_username || "Unclaimed lead"}
-                              </strong>
+                              <div className="flex items-center gap-2">
+                                {entry.lead_profile_pic ? (
+                                  <img
+                                    src={entry.lead_profile_pic}
+                                    alt={entry.lead_username || "Lead"}
+                                    className="w-7 h-7 rounded-full object-cover border border-white shadow-sm"
+                                  />
+                                ) : (
+                                  <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center text-[10px] font-bold">
+                                    {(entry.lead_username || "U")
+                                      .slice(0, 2)
+                                      .toUpperCase()}
+                                  </div>
+                                )}
+                                <strong>
+                                  {entry.lead_username || "Unclaimed lead"}
+                                </strong>
+                              </div>
                               <span
                                 className="department-chip"
                                 style={{
@@ -998,7 +972,24 @@ export default function LeadLinksManager(): React.JSX.Element | null {
                 return (
                   <div className="generated-card" key={entry.id}>
                     <div className="generated-card-head">
-                      <strong>{entry.lead_username || "Unclaimed lead"}</strong>
+                      <div className="flex items-center gap-2 min-w-0">
+                        {entry.lead_profile_pic ? (
+                          <img
+                            src={entry.lead_profile_pic}
+                            alt={entry.lead_username || "Lead"}
+                            className="w-8 h-8 rounded-full object-cover border border-white shadow-sm"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center text-[10px] font-bold shrink-0">
+                            {(entry.lead_username || "U")
+                              .slice(0, 2)
+                              .toUpperCase()}
+                          </div>
+                        )}
+                        <strong className="truncate">
+                          {entry.lead_username || "Unclaimed lead"}
+                        </strong>
+                      </div>
                       <span
                         className="department-chip"
                         style={{

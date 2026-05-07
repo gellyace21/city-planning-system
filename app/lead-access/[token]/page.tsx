@@ -3,6 +3,7 @@
 import { signIn } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
+import { departmentOptions } from "@/lib/leadDepartments";
 
 export default function LeadAccessPage(): React.JSX.Element {
   const router = useRouter();
@@ -14,7 +15,9 @@ export default function LeadAccessPage(): React.JSX.Element {
   const [valid, setValid] = useState(false);
   const [leadUsername, setLeadUsername] = useState("");
   const [needsUsername, setNeedsUsername] = useState(false);
+  const [needsDepartment, setNeedsDepartment] = useState(false);
   const [usernameInput, setUsernameInput] = useState("");
+  const [departmentInput, setDepartmentInput] = useState("General");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -31,6 +34,8 @@ export default function LeadAccessPage(): React.JSX.Element {
         } else {
           setLeadUsername(data.leadUsername || "");
           setNeedsUsername(Boolean(data.needsUsername));
+          setNeedsDepartment(Boolean(data.needsDepartment));
+          setDepartmentInput(data.department || "General");
           setValid(Boolean(data.valid));
         }
       } catch {
@@ -52,6 +57,11 @@ export default function LeadAccessPage(): React.JSX.Element {
       return;
     }
 
+    if (needsDepartment && !departmentInput.trim()) {
+      setError("Please select your department.");
+      return;
+    }
+
     setSubmitting(true);
     setError("");
 
@@ -59,9 +69,10 @@ export default function LeadAccessPage(): React.JSX.Element {
       const verifyResponse = await fetch(`/api/lead-links/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          needsUsername ? { username: usernameInput.trim() } : {},
-        ),
+        body: JSON.stringify({
+          ...(needsUsername ? { username: usernameInput.trim() } : {}),
+          ...(needsDepartment ? { department: departmentInput.trim() } : {}),
+        }),
       });
 
       const verifyData = await verifyResponse.json();
@@ -99,6 +110,7 @@ export default function LeadAccessPage(): React.JSX.Element {
           border: 1px solid #d6f0e4;
           padding: 28px 24px;
           font-family: "Lato", sans-serif;
+          margin-top: 14rem;
         }
 
         h1 {
@@ -199,8 +211,10 @@ export default function LeadAccessPage(): React.JSX.Element {
           <h1>Lead Access Portal</h1>
           <p>
             {needsUsername
-              ? "Enter your username to continue to your assigned workspace."
-              : "Click continue to enter your assigned workspace."}
+              ? "Enter your username and department to continue to your assigned workspace."
+              : needsDepartment
+                ? "Select your department to continue to your assigned workspace."
+                : "Click continue to enter your assigned workspace."}
           </p>
           {leadUsername ? (
             <div className="username-chip">Lead: {leadUsername}</div>
@@ -221,6 +235,24 @@ export default function LeadAccessPage(): React.JSX.Element {
                   onChange={(e) => setUsernameInput(e.target.value)}
                   placeholder="Enter your username"
                 />
+              </>
+            ) : null}
+            {needsDepartment ? (
+              <>
+                <label className="field-label" htmlFor="lead-department">
+                  Department
+                </label>
+                <select
+                  id="lead-department"
+                  value={departmentInput}
+                  onChange={(e) => setDepartmentInput(e.target.value)}
+                >
+                  {departmentOptions.map((department) => (
+                    <option key={department} value={department}>
+                      {department}
+                    </option>
+                  ))}
+                </select>
               </>
             ) : null}
             <button type="submit" className="btn" disabled={submitting}>

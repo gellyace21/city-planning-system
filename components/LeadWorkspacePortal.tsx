@@ -191,7 +191,7 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
         .lead-portal-shell {
           width: 100%;
           min-height: 100vh;
-          margin-top: 0;
+          margin-top: 2rem;
           background: #e8f8f2;
           font-family: var(--font-sans), sans-serif;
         }

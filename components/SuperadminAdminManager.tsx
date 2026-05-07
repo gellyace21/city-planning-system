@@ -31,13 +31,18 @@ export default function SuperadminAdminManager(): React.JSX.Element {
       const response = await fetch("/api/superadmin/admins", {
         cache: "no-store",
       });
-      const data = (await response.json()) as { admins?: AdminRecord[]; error?: string };
+      const data = (await response.json()) as {
+        admins?: AdminRecord[];
+        error?: string;
+      };
       if (!response.ok) {
         throw new Error(data.error || "Failed to load admin accounts.");
       }
       setAdmins(data.admins ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load admin accounts.");
+      setError(
+        err instanceof Error ? err.message : "Failed to load admin accounts.",
+      );
     } finally {
       setLoading(false);
     }
@@ -73,7 +78,9 @@ export default function SuperadminAdminManager(): React.JSX.Element {
       setIsSuperadmin(false);
       await loadAdmins();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create account.");
+      setError(
+        err instanceof Error ? err.message : "Failed to create account.",
+      );
     }
   };
 
@@ -91,7 +98,9 @@ export default function SuperadminAdminManager(): React.JSX.Element {
       }
       await loadAdmins();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update account.");
+      setError(
+        err instanceof Error ? err.message : "Failed to update account.",
+      );
     }
   };
 
@@ -112,7 +121,9 @@ export default function SuperadminAdminManager(): React.JSX.Element {
       }
       await loadAdmins();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update account.");
+      setError(
+        err instanceof Error ? err.message : "Failed to update account.",
+      );
     }
   };
 
@@ -135,16 +146,20 @@ export default function SuperadminAdminManager(): React.JSX.Element {
       setPendingDelete(null);
       await loadAdmins();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete account.");
+      setError(
+        err instanceof Error ? err.message : "Failed to delete account.",
+      );
     } finally {
       setDeleteLoading(false);
     }
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-6">
+    <div className="max-w-5xl mx-auto p-6 space-y-6 mt-16">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Super Admin Control Panel</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Super Admin Control Panel
+        </h1>
         <p className="text-sm text-gray-500">
           Create and manage admin accounts with full authentication control.
         </p>
@@ -225,15 +240,23 @@ export default function SuperadminAdminManager(): React.JSX.Element {
         {loading ? (
           <p className="px-4 py-5 text-sm text-gray-500">Loading accounts...</p>
         ) : admins.length === 0 ? (
-          <p className="px-4 py-5 text-sm text-gray-500">No admin accounts found.</p>
+          <p className="px-4 py-5 text-sm text-gray-500">
+            No admin accounts found.
+          </p>
         ) : (
           <div className="divide-y divide-gray-100">
             {admins.map((record) => (
-              <div key={record.id} className="px-4 py-3 flex items-center justify-between gap-3">
+              <div
+                key={record.id}
+                className="px-4 py-3 flex items-center justify-between gap-3"
+              >
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate">{record.name}</p>
+                  <p className="text-sm font-semibold text-gray-900 truncate">
+                    {record.name}
+                  </p>
                   <p className="text-xs text-gray-500 truncate">
-                    {record.email} · {record.is_superadmin ? "Super Admin" : "Admin"}
+                    {record.email} ·{" "}
+                    {record.is_superadmin ? "Super Admin" : "Admin"}
                   </p>
                   <p className="text-xs text-gray-400">
                     Created {new Date(record.created_at).toLocaleDateString()}
@@ -246,7 +269,9 @@ export default function SuperadminAdminManager(): React.JSX.Element {
                     }}
                     className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200"
                   >
-                    {record.is_superadmin ? "Set as Admin" : "Set as Super Admin"}
+                    {record.is_superadmin
+                      ? "Set as Admin"
+                      : "Set as Super Admin"}
                   </button>
                   <button
                     onClick={() => {
@@ -279,10 +304,12 @@ export default function SuperadminAdminManager(): React.JSX.Element {
       {pendingDelete ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-xl">
-            <h3 className="text-base font-bold text-gray-900">Confirm account deletion</h3>
+            <h3 className="text-base font-bold text-gray-900">
+              Confirm account deletion
+            </h3>
             <p className="mt-2 text-sm text-gray-600">
-              Delete <span className="font-semibold">{pendingDelete.name}</span> ({pendingDelete.email})?
-              This action cannot be undone.
+              Delete <span className="font-semibold">{pendingDelete.name}</span>{" "}
+              ({pendingDelete.email})? This action cannot be undone.
             </p>
             <div className="mt-5 flex items-center justify-end gap-2">
               <button

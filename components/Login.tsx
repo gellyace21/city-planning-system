@@ -1,5 +1,5 @@
 "use client";
-import { getSession, signIn } from "next-auth/react";
+import { getSession, signIn, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -33,7 +33,11 @@ export default function Login(): React.JSX.Element {
       const role = session?.user?.role;
 
       if (role === "superadmin") {
-        router.replace("/dashboard/superadmin");
+        await signOut({ redirect: false });
+        setError(
+          "System administrator accounts must use the System Administrator login.",
+        );
+        return;
       } else if (role === "admin") {
         router.replace("/dashboard");
       }

@@ -59,6 +59,7 @@ export const authOptions: AuthOptions = {
                 email: lead.username || `lead-${lead.id}`,
                 role: "lead",
                 department: lead.department,
+                profile_pic: lead.profile_pic,
               };
             }
           }

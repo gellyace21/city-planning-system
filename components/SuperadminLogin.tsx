@@ -49,7 +49,7 @@ export default function SuperadminLogin(): React.JSX.Element {
 
   return (
     <div className="fp2-root">
-      <main className="fp2-main">
+      <main className="fp2-main overlay">
         <div className="panel-left">
           <div className="seal-wrap">
             <img
@@ -60,7 +60,7 @@ export default function SuperadminLogin(): React.JSX.Element {
           </div>
 
           <h2 className="welcome-title">System Administrator</h2>
-          <p className="welcome-sub">Sign in to manage admin accounts</p>
+          <p className="welcome-sub">Please login to continue</p>
 
           <form onSubmit={handleSubmit} className="login-form">
             <div className="form-group">
@@ -68,7 +68,7 @@ export default function SuperadminLogin(): React.JSX.Element {
                 onChange={(e) => setEmail(e.target.value)}
                 type="email"
                 name="email"
-                placeholder="System Administrator Email"
+                placeholder="Email"
                 required
               />
             </div>
@@ -106,7 +106,7 @@ export default function SuperadminLogin(): React.JSX.Element {
           --text-muted: #5a8070;
           --input-border: #a8d0bf;
 
-          min-height: calc(100vh - 84px);
+          min-height: 100%;
           display: flex;
           width: 100%;
           flex-direction: column;
@@ -122,23 +122,34 @@ export default function SuperadminLogin(): React.JSX.Element {
         }
 
         .fp2-main {
-          flex: 1;
           display: flex;
           align-items: center;
           justify-content: center;
-          height: 100%;
+          height: 100vh;
           width: 100%;
+          position: relative;
+          background: url("images/city-hall.jpg");
+          background-position: center;
+          background-size: cover;
         }
 
         .panel-left {
           display: flex;
           flex-direction: column;
-          height: 100vh;
-          width: 50%;
+          height: 40rem;
+          border-radius: 1rem;
+          min-width: 30rem;
           align-items: center;
           justify-content: center;
+          justify-self: flex-end;
           z-index: 1;
-          background: #eaffee;
+          background: #e3fff2;
+          background: linear-gradient(
+            180deg,
+            rgba(227, 255, 242, 0.5) 5%,
+            rgba(255, 255, 255, 1) 30%
+          );
+          box-shadow: 0 0 12px rgba(118, 156, 138, 0.2);
         }
 
         .seal-wrap {
@@ -181,7 +192,7 @@ export default function SuperadminLogin(): React.JSX.Element {
         }
 
         .form-group input {
-          width: 50%;
+          width: 70%;
           padding: 11px 14px;
           border: 1.5px solid var(--input-border);
           border-radius: 8px;
@@ -191,10 +202,17 @@ export default function SuperadminLogin(): React.JSX.Element {
           outline: none;
         }
 
+        .form-group input:focus {
+          border-color: var(--green-mid);
+          box-shadow: 0 0 0 3px rgba(76, 175, 138, 0.15);
+          background: var(--white);
+        }
+
         .btn-login {
-          width: 50%;
+          width: 70%;
           padding: 11px;
           margin-top: 6px;
+          justify-self: center;
           background: var(--green-dark);
           color: var(--white);
           border: none;
@@ -203,6 +221,7 @@ export default function SuperadminLogin(): React.JSX.Element {
           font-weight: 700;
           letter-spacing: 1px;
           cursor: pointer;
+          box-shadow: 0 4px 12px rgba(46, 125, 98, 0.3);
         }
 
         .register-link {
@@ -218,24 +237,22 @@ export default function SuperadminLogin(): React.JSX.Element {
         }
 
         .panel-right {
-          position: relative;
+          position: absolute;
+          top: 0;
+          left: 0;
           height: 100vh;
-          display: flex;
           align-items: center;
-          flex: 1;
           justify-content: center;
           overflow: hidden;
           background: url("images/city-hall.jpg");
           background-position: center;
           background-size: cover;
+          z-index: 1000;
         }
 
         .panel-overlay {
           border-image: fill 0
-            linear-gradient(
-              rgba(234, 255, 238, 0.45),
-              rgba(234, 255, 238, 0.45)
-            );
+            linear-gradient(rgba(220, 255, 238, 0.8), rgba(220, 255, 238, 0.8));
         }
 
         .map-svg {

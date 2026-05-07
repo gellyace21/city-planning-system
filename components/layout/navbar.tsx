@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AvatarDropdown } from "./avatar-dropdown";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { IconBell, IconHome } from "@tabler/icons-react";
 import {
   fetchNotificationsAction,
@@ -19,7 +19,9 @@ const Navbar = () => {
   const router = useRouter();
   const { data: session, status } = useSession();
   const role = session?.user?.role;
-  const isLead = role === "lead";
+  const isSuperadmin = role === "superadmin";
+  const isLeadAccessRoute = pathname.startsWith("/lead-access");
+  const isLead = role === "lead" && isLeadAccessRoute;
   const isNotificationActor = role === "admin" || role === "lead";
 
   const [notifications, setNotifications] = useState<NotificationEntry[]>([]);
@@ -32,7 +34,7 @@ const Navbar = () => {
     : "/dashboard";
 
   const showNav = pathname !== "/login" && status === "authenticated";
-  const showNavItems = pathname !== "/dashboard" && !isLead;
+  const showNavItems = !isSuperadmin && pathname !== "/dashboard" && !isLead;
 
   const unreadCount = useMemo(
     () => notifications.filter((item) => !item.read_at).length,
@@ -93,6 +95,10 @@ const Navbar = () => {
     } finally {
       setMarkingAll(false);
     }
+  };
+
+  const handleLogout = async (): Promise<void> => {
+    await signOut({ redirect: true, callbackUrl: "/superadmin-login" });
   };
 
   return (
@@ -191,7 +197,20 @@ const Navbar = () => {
               )}
             </ul>
             <ul className="flex items-center h-full mr-6 gap-6">
-              {isNotificationActor ? (
+              {isSuperadmin ? (
+                <li className="flex items-center h-full">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleLogout();
+                    }}
+                    className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-500 transition duration-200"
+                  >
+                    Log out
+                  </button>
+                </li>
+              ) : null}
+              {!isLead && isNotificationActor ? (
                 <li className="relative" ref={notificationPanelRef}>
                   <button
                     type="button"
@@ -289,9 +308,11 @@ const Navbar = () => {
                   )}
                 </li>
               ) : null}
-              <li className="flex items-center h-full">
-                <AvatarDropdown />
-              </li>
+              {!isLeadAccessRoute && !isSuperadmin ? (
+                <li className="flex items-center h-full">
+                  <AvatarDropdown />
+                </li>
+              ) : null}
             </ul>
           </div>
         ) : null}
