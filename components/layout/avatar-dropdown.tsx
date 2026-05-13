@@ -13,9 +13,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import ProfileModal from "@/components/ProfileModal";
+import SettingsModal from "@/components/SettingsModal";
 
 export function AvatarDropdown() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { data: session } = useSession();
   const avatarSrc = session?.user?.profile_pic || "";
   const avatarFallback = session?.user?.name?.slice(0, 2).toUpperCase() || "U";
@@ -50,7 +52,9 @@ export function AvatarDropdown() {
             <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
               Profile
             </DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
+              Settings
+            </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
@@ -64,6 +68,10 @@ export function AvatarDropdown() {
       <ProfileModal
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
+      />
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
       />
     </>
   );

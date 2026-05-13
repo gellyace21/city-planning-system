@@ -245,6 +245,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
           gap: 8px;
           // width: min(860px, 100%);
           width: auto;
+          background: var(--background-plain);
         }
 
         .lead-row {
@@ -266,7 +267,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
 
         .lead-input {
           height: 36px;
-          border: 1.5px solid #a8dfc5;
+          border: 1.5px solid var(--background-plain);
           border-radius: 8px;
           padding: 0 12px;
           outline: none;
@@ -399,8 +400,8 @@ export default function LeadLinksManager(): React.JSX.Element | null {
 
         .generated-list {
           width: 100%;
-          background: rgba(255, 255, 255, 0.7);
-          border: 1px solid #d6f0e4;
+          // background: rgba(255, 255, 255, 0.7);
+          border: 1px solid var(--background-plain);
           border-radius: 10px;
           padding: 12px;
           display: flex;
@@ -411,7 +412,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
         .generated-title {
           font-size: 12px;
           font-weight: 700;
-          color: #2c4a3a;
+          color: var(--primary);
           text-transform: uppercase;
           letter-spacing: 0.06em;
         }
@@ -423,9 +424,9 @@ export default function LeadLinksManager(): React.JSX.Element | null {
           gap: 12px;
           flex-wrap: wrap;
           padding: 8px;
-          border: 1px solid #e3f2eb;
+          border: 1px solid var(--background);
           border-radius: 10px;
-          background: #f8fdfb;
+          background: var(--background-plain);
         }
 
         .filter-group {
@@ -433,7 +434,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
           align-items: center;
           gap: 8px;
           font-size: 11px;
-          color: #3b5c50;
+          // color: #3b5c50;
         }
 
         .filter-label {
@@ -484,12 +485,13 @@ export default function LeadLinksManager(): React.JSX.Element | null {
         }
 
         .generated-card {
-          border: 1px solid #dcefe7;
+          border: 1px solid var(--background);
           border-radius: 10px;
           padding: 10px;
-          background: #ffffff;
+          background: var(--background-plain);
           display: flex;
           flex-direction: column;
+          text: var(--foreground);
           gap: 8px;
         }
 
@@ -499,7 +501,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
           justify-content: space-between;
           gap: 8px;
           font-size: 12px;
-          color: #2c4a3a;
+          color: var(--foreground);
         }
 
         .generated-card-meta {
@@ -594,10 +596,10 @@ export default function LeadLinksManager(): React.JSX.Element | null {
         }
 
         .department-section {
-          border: 1px solid #e2efe8;
+          border: 1px solid var(--background-plain);
           border-radius: 10px;
           overflow: hidden;
-          background: #ffffff;
+          background: var(--card);
         }
 
         .department-header {
@@ -605,7 +607,8 @@ export default function LeadLinksManager(): React.JSX.Element | null {
           align-items: center;
           justify-content: space-between;
           padding: 8px 10px;
-          border-bottom: 1px solid #e2efe8;
+          border-bottom: 1px solid var(--background-plain);
+          background-color: var(--background-plain);
         }
 
         .department-badge {
@@ -618,7 +621,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
 
         .department-meta {
           font-size: 11px;
-          color: #3b5c50;
+          // color: #3b5c50;
         }
 
         .department-links {
@@ -646,10 +649,10 @@ export default function LeadLinksManager(): React.JSX.Element | null {
           align-items: center;
           justify-content: space-between;
           gap: 8px;
-          border: 1px solid #dcefe7;
+          border: 1px solid var(--background);
           border-radius: 8px;
           padding: 8px 10px;
-          background: #ffffff;
+          background: var(--background-plain);
         }
 
         .generated-meta {
@@ -784,7 +787,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
       </span>
 
       {generatedLinks.length > 0 ? (
-        <div className="generated-list">
+        <div className="generated-list bg-(--muted-card)">
           <div className="generated-title">Generated Links by Department</div>
           <div className="generated-controls">
             <div className="filter-group">
@@ -830,13 +833,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
                 if (entries.length === 0) return null;
                 return (
                   <div className="department-section" key={department}>
-                    <div
-                      className="department-header"
-                      style={{
-                        background: theme.color.bg,
-                        borderColor: theme.color.border,
-                      }}
-                    >
+                    <div className="department-header">
                       <span
                         className="department-badge"
                         style={{
@@ -847,7 +844,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
                       >
                         {department}
                       </span>
-                      <span className="department-meta">
+                      <span className="department-meta font-bold text-(--primary)">
                         {entries.length} lead{entries.length > 1 ? "s" : ""}
                       </span>
                     </div>

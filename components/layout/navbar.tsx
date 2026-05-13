@@ -103,7 +103,7 @@ const Navbar = () => {
 
   return (
     <header className="w-full h-16 z-50 fixed top-0 left-0 font-josefin">
-      <nav className="h-full w-full flex items-center justify-between bg-[#015440] bg-white pr-8 pl-8 drop-shadow-md drop-shadow-gray-500:5">
+      <nav className="h-full w-full flex items-center justify-between bg-(--background-plain) pr-8 pl-8 drop-shadow-md drop-shadow-gray-500:5">
         <div
           className="flex items-center hover:cursor-pointer"
           onClick={() => router.push(dashboardTarget)}
@@ -115,9 +115,9 @@ const Navbar = () => {
             width={38}
           />
           <h2
-            className={`uppercase ml-2 text-black tracking-widest text-m mt-1`}
+            className={`uppercase ml-2 text-(--foreground) tracking-widest text-m mt-1`}
           >
-            City Planning AND Development Office
+            City Planning and Development Office
           </h2>
         </div>
 
@@ -125,30 +125,31 @@ const Navbar = () => {
         {showNav ? (
           <div className="flex items-center gap-4 h-full">
             <ul
-              className={`flex items-center h-8 mr-8 gap-4 [&>li>a]:tracking-widest [&>li]:pb-4 [&>li]:pt-1 [&>li]:px-4 [&>li]:rounded-sm [&>li]:text-black [&>li]:hover:bg-background [&>li]:hover:text-(--primary) [&>li]:transition [&>li]:duration-100`}
+              className={`flex items-center h-8 mr-8 gap-4 [&>li>a]:tracking-widest [&>li]:pb-4 [&>li]:pt-1 [&>li]:px-4 [&>li]:text-(--foreground) [&>li]:hover:border-b-2 [&>li]:hover:border-b-(--primary) [&>li]:hover:text-(--primary) [&>li]:transition [&>li]:duration-100`}
             >
               {showNavItems && (
                 <>
                   {!isLead ? (
                     <li
-                      className={`h-full group ${pathname === "/dashboard/project-monitoring" ? "bg-background text-black" : "text-black"}`}
+                      className={`h-full group ${pathname === "/dashboard/project-monitoring" ? "border-b-2 border-b-(--primary) text-(--foreground)" : "text-(--foreground)"}`}
                     >
                       <Link
                         href="/dashboard/project-monitoring"
                         className="flex items-center justify-center gap-2"
                       >
                         <img
-                          src="icons/chart.png"
+                          src="/icons/chart.png"
                           alt=""
                           width={16}
-                          className="invert group-hover:filter-[brightness(0)_saturate(100%)_invert(47%)_sepia(71%)_saturate(499%)_hue-rotate(123deg)_brightness(87%)_contrast(97%)] transition duration-200"
+                          height={16}
+                          className="invert-0 dark:invert group-hover:filter-[brightness(0)_saturate(100%)_invert(47%)_sepia(71%)_saturate(499%)_hue-rotate(123deg)_brightness(87%)_contrast(97%)] dark:group-hover:filter-[brightness(0)_saturate(100%)_invert(47%)_sepia(71%)_saturate(499%)_hue-rotate(123deg)_brightness(87%)_contrast(97%)] transition duration-200"
                         />
                         Project Monitoring
                       </Link>
                     </li>
                   ) : null}
                   <li
-                    className={`h-full group ${pathname === "/dashboard/annual-investment-plan" ? "bg-background [&>span]:text-(--primary)" : "text-black"}`}
+                    className={`h-full group ${pathname === "/dashboard/annual-investment-plan" ? "border-b-2 border-b-(--primary) [&>span]:text-(--primary)" : "text-black"}`}
                   >
                     <Link
                       href="/dashboard/annual-investment-plan"
@@ -167,7 +168,7 @@ const Navbar = () => {
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             width={16}
-                            className="stroke-black group-hover:stroke-(--primary)"
+                            className="stroke-(--foreground) group-hover:stroke-(--primary)"
                           >
                             <path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
                             <path d="M22 12A10 10 0 0 0 12 2v10z"></path>
@@ -179,7 +180,7 @@ const Navbar = () => {
                   </li>
                   {!isLead ? (
                     <li
-                      className={`h-full group ${pathname === "/dashboard" ? "bg-background text-black" : "text-white"}`}
+                      className={`h-full group ${pathname === "/dashboard" ? "border-b-2 border-b-(--primary) text-(--foreground)" : "text-(--foreground)"}`}
                     >
                       <Link
                         href="/dashboard"
@@ -187,7 +188,7 @@ const Navbar = () => {
                       >
                         <IconHome
                           width={16}
-                          className="group-hover:stroke-black"
+                          className="stroke-(--foreground) group-hover:stroke-(--primary)"
                         />
                         Home
                       </Link>
@@ -215,7 +216,7 @@ const Navbar = () => {
                   <button
                     type="button"
                     onClick={() => setShowNotifications((prev) => !prev)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-black/25 bg-grey/15 px-3 py-1.5 text-sm font-semibold text-white hover:bg-black/15  hover:cursor-pointer active:scale-95 transition-transform group"
+                    className="inline-flex items-center gap-1 rounded-lg border border-(--muted-foreground)/25 bg-(--foreground)/15 px-3 py-1.5 text-sm font-semibold text-(--foreground) hover:bg-(--muted-foreground)/15  hover:cursor-pointer active:scale-95 transition-transform group"
                   >
                     {/*Notification Icon*/}
                     <IconBell
@@ -230,7 +231,7 @@ const Navbar = () => {
                     )}
                   </button>
                   {showNotifications && (
-                    <div className="absolute right-0 top-11 z-30 w-96 max-h-96 overflow-auto rounded-xl border border-gray-200 bg-white shadow-lg">
+                    <div className="absolute right-0 top-11 z-30 w-96 max-h-96 overflow-auto rounded-xl border border-(--background-plain) bg-background shadow-lg">
                       {notifications.length === 0 ? (
                         <p className="px-4 py-3 text-sm text-gray-500">
                           No notifications.

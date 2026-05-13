@@ -46,6 +46,7 @@ import {
   IconHistory,
   IconPrinter,
   IconTrash,
+  IconUsers,
 } from "@tabler/icons-react";
 import { downloadAIP, parseAIPExcel } from "@/lib/aipExport";
 import { downloadMonitoringTemplateMapped } from "@/lib/monitoringExport";
@@ -229,6 +230,7 @@ export default function ProjectTable({
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [infoMsg, setInfoMsg] = useState<string>("");
   const [showHistory, setShowHistory] = useState<boolean>(false);
+  const [showLeadHistory, setShowLeadHistory] = useState<boolean>(false);
   const [compareEntry, setCompareEntry] = useState<EditHistoryEntry | null>(
     null,
   );
@@ -1465,11 +1467,11 @@ export default function ProjectTable({
   return (
     <div className="min-h-screen relative p-20">
       <div
-        className={`max-w-screen mx-auto px-12 py-12 space-y-4 duration-200 ease-in-out ${showHistory ? "mr-74 w-[85vw]" : "mr-0 w-[90vw]"}`}
+        className={`max-w-screen mx-auto px-12 py-12 space-y-4 transition-all duration-200 ease-in-out ${showHistory ? "mr-74 w-[80vw]" : showLeadHistory ? "ml-50 w-[85vw]" : "mr-0 ml-0 w-[90vw]"} "}`}
       >
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">
+            <h1 className="text-xl font-bold text-(--primary)">
               {mode === "aip" ? "Annual Investment Plan" : "Project Monitoring"}
             </h1>
             <p className="text-sm text-gray-500">
@@ -1507,8 +1509,21 @@ export default function ProjectTable({
               <>
                 <button
                   onClick={() => {
-                    if (showHistory) {
-                      setShowHistory(false);
+                    setShowLeadHistory(!showLeadHistory);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold border flex gap-2 justify-center items-center hover:bg-amber-100 hover:cursor-pointer duration-200 ease-in-out ${
+                    showLeadHistory
+                      ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-400"
+                      : "bg-white text-blue-700 border-blue-200"
+                  }`}
+                >
+                  <IconUsers size={16} />
+                  Lead History ({leadFiles.length})
+                </button>
+                <button
+                  onClick={() => {
+                    if (showLeadHistory) {
+                      setShowLeadHistory(false);
                       return;
                     }
                     openHistoryPanel();
@@ -1626,7 +1641,10 @@ export default function ProjectTable({
         {mode === "aip" ? (
           <>
             {(isLead || isAdmin) && (
-              <div className="p-4 rounded-xl border border-gray-200 bg-white">
+              // Lead Upload Section - turn into sidebar
+              <div
+                className={`lead-upload absolute w-60 p-4 rounded-xl border border-gray-200 bg-white transition-all duration-300 ease-in-out z-10 ${showLeadHistory ? "left-15" : "-left-150"}`}
+              >
                 <div className="flex flex-wrap gap-3 items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-gray-800">

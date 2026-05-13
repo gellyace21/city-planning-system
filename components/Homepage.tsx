@@ -8,7 +8,7 @@ export default function Homepage(): React.JSX.Element {
   const router = useRouter();
 
   return (
-    <main className="homepage-shell">
+    <main className="homepage-shell bg-background">
       <style jsx>{`
         .homepage-shell {
           min-height: 100vh;
@@ -18,7 +18,7 @@ export default function Homepage(): React.JSX.Element {
           align-items: center;
           height: auto;
           justify-content: center;
-          background: #eaf7f0;
+          // background: #eaf7f0;
           width: 100%;
           margin-top: 0;
           font-family: "Lato", sans-serif;
@@ -155,7 +155,7 @@ export default function Homepage(): React.JSX.Element {
           border-width: 10px;
           border-image-source: linear-gradient(
             90deg,
-            #eaf7f0 30%,
+            var(--border-gradient-color) 30%,
             rgba(0, 0, 0, 0)
           );
           border-image-slice: fill 1;
@@ -163,7 +163,7 @@ export default function Homepage(): React.JSX.Element {
 
         .lead-links {
           margin-top: -5rem;
-          background-color: #fff;
+          background-color: var(--background-plain);
           padding: 1rem;
           border-radius: 1rem;
           width: 90%;

@@ -97,6 +97,16 @@ const detectDataStartRow = (ws: ExcelJS.Worksheet): number => {
   return 7;
 };
 
+const detectFooterStartRow = (ws: ExcelJS.Worksheet): number => {
+  for (let row = 1; row <= 80; row += 1) {
+    const submittedBy = getCellString(ws.getCell(`B${row}`).value);
+    if (submittedBy.toLowerCase().includes("submitted by")) {
+      return row;
+    }
+  }
+  return 32;
+};
+
 const resolveTemplateWorksheet = (
   workbook: ExcelJS.Workbook,
 ): ExcelJS.Worksheet | undefined => {
@@ -184,27 +194,14 @@ export function downloadMonitoringTemplateMapped(
       }
 
       const dataStartRow = detectDataStartRow(ws);
+      const footerStartRow = detectFooterStartRow(ws);
+      const dataEndRow = footerStartRow - 1;
+      const capacity = dataEndRow - dataStartRow + 1;
 
-      for (let row = dataStartRow; row <= dataStartRow + 500; row += 1) {
-        for (const col of [
-          COLUMN.project_name,
-          COLUMN.agency,
-          COLUMN.location,
-          COLUMN.approved_budget,
-          COLUMN.certified_amount,
-          COLUMN.obligation,
-          COLUMN.actual_cost,
-          COLUMN.funding,
-          COLUMN.certified_date,
-          COLUMN.major_findings,
-          COLUMN.issues,
-          COLUMN.status_percent,
-          COLUMN.action_recommendation_primary,
-          COLUMN.action_recommendation_secondary,
-          COLUMN.remarks,
-        ]) {
-          writeCell(ws, col, row, null);
-        }
+      if (data.length > capacity) {
+        const extraRows = data.length - capacity;
+        const blankRows = Array.from({ length: extraRows }, () => []);
+        ws.spliceRows(footerStartRow, 0, ...blankRows);
       }
 
       data.forEach((row, index) => {
