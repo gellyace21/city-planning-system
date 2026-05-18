@@ -8,5 +8,6 @@
 
 # Problems as of May 17
 - Monitoring export is corrupted
-- Fullscreen takes full monitor space
+- Still no fullscreen functionality
 - Still no published database
+- The the sheet should span the whole bottom, just like regular excel; there should be no need for an add row button, just empty rows (refer to ProjectTable)
