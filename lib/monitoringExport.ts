@@ -177,6 +177,7 @@ export function downloadMonitoringCsv(
   downloadBlob(blob, filename);
 }
 
+// Old export function
 export function downloadMonitoringTemplateMapped(
   data: MonitoringExportRow[],
   filename = "Project_Monitoring_Status_Report.xlsx",
@@ -283,3 +284,56 @@ export function downloadMonitoringTemplateMapped(
     }
   })();
 }
+
+// From claude
+// export function downloadMonitoringTemplateMapped(
+//   data: MonitoringExportRow[],
+//   filename = "Project_Monitoring_Status_Report.xlsx",
+//   options: { fallbackToCsv?: boolean } = {},
+// ): void {
+//   void (async () => {
+//     try {
+//       const workbook = new ExcelJS.Workbook();
+//       await workbook.xlsx.load(
+//         toArrayBufferFromBase64(MONITORING_TEMPLATE_BASE64),
+//       );
+
+//       const ws = workbook.worksheets[0]; // direct index — sheet is "Non-Infrastructure Projects"
+//       if (!ws) throw new Error("Template worksheet not found.");
+
+//       const DATA_START_ROW = 7;
+
+//       data.forEach((row, index) => {
+//         const targetRow = DATA_START_ROW + index;
+
+//         writeCell(ws, COLUMN.project_name, targetRow, row.project_name || null);
+//         writeCell(ws, COLUMN.agency, targetRow, row.agency || null);
+//         writeCell(ws, COLUMN.location, targetRow, row.location || null);
+//         writeCell(ws, COLUMN.approved_budget, targetRow, toFiniteNumber(row.approved_budget));
+//         writeCell(ws, COLUMN.certified_amount, targetRow, toFiniteNumber(row.certified_amount));
+//         writeCell(ws, COLUMN.obligation, targetRow, toFiniteNumber(row.obligation));
+//         writeCell(ws, COLUMN.actual_cost, targetRow, toFiniteNumber(row.actual_cost));
+//         writeCell(ws, COLUMN.funding, targetRow, row.funding || null);
+//         writeCell(ws, COLUMN.certified_date, targetRow, row.certified_date || null);
+//         writeCell(ws, COLUMN.major_findings, targetRow, row.major_findings || null);
+//         writeCell(ws, COLUMN.issues, targetRow, row.issues || null);
+//         writeCell(ws, COLUMN.status_percent, targetRow, toFiniteNumber(row.status_percent));
+//         writeCell(ws, COLUMN.action_recommendation_primary, targetRow, row.action_recommendation || null);
+//         writeCell(ws, COLUMN.action_recommendation_secondary, targetRow, row.action_recommendation || null);
+//         writeCell(ws, COLUMN.remarks, targetRow, row.remarks || null);
+//       });
+
+//       const buffer = await workbook.xlsx.writeBuffer();
+//       const blob = new Blob([buffer], {
+//         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+//       });
+//       downloadBlob(blob, filename);
+//     } catch (error) {
+//       if (options.fallbackToCsv) {
+//         downloadMonitoringCsv(data, "project_monitoring_export.csv");
+//         return;
+//       }
+//       throw error;
+//     }
+//   })();
+// }

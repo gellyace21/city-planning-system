@@ -4,3 +4,9 @@
 - fix navbar buttons
 - history sidebar overlaps with table
 - Notification in navbar cannot be seen normal state
+
+
+# Problems as of May 17
+- Monitoring export is corrupted
+- Fullscreen takes full monitor space
+- Still no published database
