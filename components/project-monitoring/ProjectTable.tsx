@@ -1106,15 +1106,17 @@ export default function ProjectTable({
     );
   };
 
-  const addAipRow = async (): Promise<void> => {
+  const createAipRowForEdit = async (): Promise<AIPRow | null> => {
     setBusy(true);
     try {
       const result = await createAipRowAction();
       setAipRows((prev) => [...prev, result.row]);
       pushHistory(result.historyEntry);
       setErrorMsg("");
+      return result.row;
     } catch (error) {
       handleFailure(error);
+      return null;
     } finally {
       setBusy(false);
     }
@@ -1233,19 +1235,22 @@ export default function ProjectTable({
     );
   };
 
-  const addMonitoringRow = async (): Promise<void> => {
-    setBusy(true);
-    try {
-      const result = await createMonitoringRowAction();
-      setMonitoringRows((prev) => [...prev, result.row]);
-      pushHistory(result.historyEntry);
-      setErrorMsg("");
-    } catch (error) {
-      handleFailure(error);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const createMonitoringRowForEdit =
+    async (): Promise<MonitoringRow | null> => {
+      setBusy(true);
+      try {
+        const result = await createMonitoringRowAction();
+        setMonitoringRows((prev) => [...prev, result.row]);
+        pushHistory(result.historyEntry);
+        setErrorMsg("");
+        return result.row;
+      } catch (error) {
+        handleFailure(error);
+        return null;
+      } finally {
+        setBusy(false);
+      }
+    };
 
   const deleteMonitoringSelection = async (): Promise<void> => {
     const ids = [...monitoringSelectedRows];
@@ -1469,9 +1474,9 @@ export default function ProjectTable({
   };
 
   return (
-    <div className="min-h-screen relative p-20">
+    <div className="min-h-screen relative py-15">
       <div
-        className={`max-w-screen mx-auto px-12 py-12 space-y-4 transition-all duration-200 ease-in-out ${showHistory ? "mr-74 w-[80vw]" : showLeadHistory ? "ml-50 w-[85vw]" : "mr-0 ml-0 w-[90vw]"} "}`}
+        className={`max-w-screen mx-auto px-0 py-0 space-y-4 transition-all duration-200 ease-in-out ${showHistory ? "mr-74 w-[80vw]" : showLeadHistory ? "ml-50 w-[85vw]" : "mr-0 ml-0 w-[90vw]"} "}`}
       >
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
@@ -1937,17 +1942,6 @@ export default function ProjectTable({
               {isAdmin && (
                 <button
                   onClick={() => {
-                    void addAipRow();
-                  }}
-                  disabled={busy}
-                  className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm font-semibold disabled:opacity-50"
-                >
-                  + Add AIP Row
-                </button>
-              )}
-              {isAdmin && (
-                <button
-                  onClick={() => {
                     void deleteAipSelection();
                   }}
                   disabled={busy || aipSelectedRows.size === 0}
@@ -1967,6 +1961,7 @@ export default function ProjectTable({
               editValue={aipEditValue}
               setEditValue={setAipEditValue}
               startEdit={startAipEdit}
+              onCreateRow={createAipRowForEdit}
               commitEdit={() => {
                 void commitAipEdit();
               }}
@@ -2044,15 +2039,6 @@ export default function ProjectTable({
               </button>
               <button
                 onClick={() => {
-                  void addMonitoringRow();
-                }}
-                disabled={busy}
-                className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold disabled:opacity-50 hover:bg-emerald-500 duration-200 ease-in-out cursor-pointer"
-              >
-                + Add Monitoring Row
-              </button>
-              <button
-                onClick={() => {
                   void deleteMonitoringSelection();
                 }}
                 disabled={busy || monitoringSelectedRows.size === 0}
@@ -2071,6 +2057,7 @@ export default function ProjectTable({
               editValue={monitoringEditValue}
               setEditValue={setMonitoringEditValue}
               startEdit={startMonitoringEdit}
+              onCreateRow={createMonitoringRowForEdit}
               commitEdit={() => {
                 void commitMonitoringEdit();
               }}

@@ -5,6 +5,7 @@ import React, {
   KeyboardEvent,
   MouseEvent as ReactMouseEvent,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -17,6 +18,9 @@ const INITIAL_COLUMN_WIDTHS = [
   52, 140, 380, 150, 190, 170, 260, 150, 110, 110, 110, 110, 120, 140, 140, 110,
   52,
 ];
+
+const EXTRA_ROW_BATCH = 20;
+const EXTRA_ROW_BUFFER = 400;
 
 const MIN_COLUMN_WIDTH = 90;
 
@@ -33,6 +37,16 @@ const MIN_COLUMN_WIDTH_BY_INDEX: Record<number, number> = {
   16: 40,
 };
 
+const AIP_NUMERIC_FIELDS = new Set<keyof AIPRow>([
+  "ps",
+  "mooe",
+  "fe",
+  "co",
+  "total",
+  "ccAdaptation",
+  "ccMitigation",
+]);
+
 interface AIPTableProps {
   filtered: AIPRow[];
   selectedRows: Set<number>;
@@ -46,6 +60,7 @@ interface AIPTableProps {
     field: keyof AIPRow,
     currentVal: string | number,
   ) => void;
+  onCreateRow: () => Promise<AIPRow | null>;
   commitEdit: () => void;
   handleKeyDown: (
     e: KeyboardEvent<HTMLInputElement | HTMLSelectElement>,
@@ -76,6 +91,7 @@ export default function AIPTable({
   editValue,
   setEditValue,
   startEdit,
+  onCreateRow,
   commitEdit,
   handleKeyDown,
   allSectors,
@@ -106,6 +122,20 @@ export default function AIPTable({
     startWidth: number;
   } | null>(null);
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [extraRowCount, setExtraRowCount] = useState(EXTRA_ROW_BATCH);
+  const emptyRows = useMemo(
+    () => Array.from({ length: extraRowCount }, (_, index) => index),
+    [extraRowCount],
+  );
+
+  const handleEmptyCellEdit = async (field: keyof AIPRow): Promise<void> => {
+    const created = await onCreateRow();
+    if (!created) return;
+    const value = (created[field] ??
+      (AIP_NUMERIC_FIELDS.has(field) ? 0 : "")) as string | number;
+    startEdit(created.id, field, value);
+  };
 
   useEffect(() => {
     const onMouseMove = (event: MouseEvent): void => {
@@ -151,6 +181,30 @@ export default function AIPTable({
     document.addEventListener("mousedown", onPointerDown);
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    const maybeExpand = (): void => {
+      if (!scrollRef.current) return;
+      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+      if (scrollHeight - (scrollTop + clientHeight) < EXTRA_ROW_BUFFER) {
+        setExtraRowCount((prev) => prev + EXTRA_ROW_BATCH);
+      }
+    };
+
+    const onScroll = (): void => {
+      window.requestAnimationFrame(maybeExpand);
+    };
+
+    const current = scrollRef.current;
+    current?.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    maybeExpand();
+
+    return () => {
+      current?.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
     };
   }, []);
 
@@ -401,7 +455,7 @@ export default function AIPTable({
       ref={tableWrapRef}
       className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
     >
-      <div className="overflow-x-auto">
+      <div ref={scrollRef} className="max-h-[70vh] overflow-auto">
         <table className="min-w-full w-max table-fixed text-[12px] border-collapse [&_th]:align-top [&_td]:align-top [&_td]:wrap-break-word [&_td]:whitespace-normal">
           <colgroup>
             {columnWidths.map((width, index) => (
@@ -809,6 +863,103 @@ export default function AIPTable({
                 </tr>
               );
             })}
+
+            {emptyRows.map((index) => (
+              <tr
+                key={`aip-empty-${index}`}
+                className="border-b border-dashed border-gray-100 text-gray-300"
+              >
+                <td className="px-1 py-1.5 text-center">
+                  <input type="checkbox" className="rounded" disabled />
+                </td>
+                <td
+                  className="px-1 py-1.5 text-[11px] italic cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("aipCode")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("description")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("sector")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("department")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("startDate")}
+                  title="Double-click to add row"
+                >
+                  start → end
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("outputs")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("funding")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                {(["ps", "mooe", "fe", "co"] as (keyof AIPRow)[]).map(
+                  (field) => (
+                    <td
+                      key={field as string}
+                      className="px-1.5 py-1.5 text-[11px] italic text-right cursor-pointer"
+                      onDoubleClick={() => handleEmptyCellEdit(field)}
+                      title="Double-click to add row"
+                    >
+                      —
+                    </td>
+                  ),
+                )}
+                <td className="px-1.5 py-1.5 text-[11px] italic text-right">
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic text-right cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("ccAdaptation")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic text-right cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("ccMitigation")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic text-center cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("ccCode")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td className="relative w-0 overflow-visible border-0 bg-transparent px-0 py-1.5" />
+              </tr>
+            ))}
           </tbody>
 
           <tfoot>

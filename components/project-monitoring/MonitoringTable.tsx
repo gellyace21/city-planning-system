@@ -5,6 +5,7 @@ import React, {
   KeyboardEvent,
   MouseEvent as ReactMouseEvent,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -30,6 +31,7 @@ interface MonitoringTableProps {
     field: keyof MonitoringRow,
     currentVal: string | number,
   ) => void;
+  onCreateRow: () => Promise<MonitoringRow | null>;
   commitEdit: () => void;
   handleKeyDown: (
     e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -57,6 +59,9 @@ const INITIAL_COLUMN_WIDTHS = [
   56, 260, 190, 150, 150, 150, 160, 150, 150, 150, 210, 210, 140, 260, 200, 56,
 ];
 
+const EXTRA_ROW_BATCH = 20;
+const EXTRA_ROW_BUFFER = 400;
+
 const MIN_COLUMN_WIDTH = 90;
 
 const MIN_COLUMN_WIDTH_BY_INDEX: Record<number, number> = {
@@ -73,6 +78,7 @@ export default function MonitoringTable({
   editValue,
   setEditValue,
   startEdit,
+  onCreateRow,
   commitEdit,
   handleKeyDown,
   handleSort,
@@ -90,6 +96,22 @@ export default function MonitoringTable({
     startX: number;
     startWidth: number;
   } | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [extraRowCount, setExtraRowCount] = useState(EXTRA_ROW_BATCH);
+  const emptyRows = useMemo(
+    () => Array.from({ length: extraRowCount }, (_, index) => index),
+    [extraRowCount],
+  );
+
+  const handleEmptyCellEdit = async (
+    field: keyof MonitoringRow,
+  ): Promise<void> => {
+    const created = await onCreateRow();
+    if (!created) return;
+    const value = (created[field] ??
+      (MONITORING_NUMERIC_FIELDS.has(field) ? 0 : "")) as string | number;
+    startEdit(created.id, field, value);
+  };
 
   useEffect(() => {
     const onMouseMove = (event: MouseEvent): void => {
@@ -121,6 +143,30 @@ export default function MonitoringTable({
     return () => {
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    const maybeExpand = (): void => {
+      if (!scrollRef.current) return;
+      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+      if (scrollHeight - (scrollTop + clientHeight) < EXTRA_ROW_BUFFER) {
+        setExtraRowCount((prev) => prev + EXTRA_ROW_BATCH);
+      }
+    };
+
+    const onScroll = (): void => {
+      window.requestAnimationFrame(maybeExpand);
+    };
+
+    const current = scrollRef.current;
+    current?.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    maybeExpand();
+
+    return () => {
+      current?.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
     };
   }, []);
 
@@ -239,7 +285,7 @@ export default function MonitoringTable({
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="overflow-x-auto">
+      <div ref={scrollRef} className="max-h-[70vh] overflow-auto">
         <table className="min-w-full w-max table-fixed text-[15px] border-collapse [&_th]:align-top [&_td]:align-top [&_td]:wrap-break-word [&_td]:whitespace-normal">
           <colgroup>
             {columnWidths.map((width, index) => (
@@ -429,6 +475,118 @@ export default function MonitoringTable({
                 </tr>
               );
             })}
+
+            {emptyRows.map((index) => (
+              <tr
+                key={`monitoring-empty-${index}`}
+                className="border-b border-dashed border-gray-100 text-gray-300"
+              >
+                <td className="px-1 py-1.5 text-center">
+                  <input type="checkbox" className="rounded" disabled />
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("project_name")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("agency")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("location")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic text-right cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("approved_budget")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic text-right cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("certified_amount")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic text-right cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("obligation")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic text-right cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("actual_cost")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("funding")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("certified_date")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("major_findings")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("issues")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic text-right cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("status_percent")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  onDoubleClick={() =>
+                    handleEmptyCellEdit("action_recommendation")
+                  }
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td
+                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  onDoubleClick={() => handleEmptyCellEdit("remarks")}
+                  title="Double-click to add row"
+                >
+                  —
+                </td>
+                <td className="relative w-0 overflow-visible border-0 bg-transparent px-0 py-1.5" />
+              </tr>
+            ))}
           </tbody>
 
           <tfoot>
