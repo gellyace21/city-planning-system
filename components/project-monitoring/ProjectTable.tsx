@@ -49,7 +49,7 @@ import {
   IconUsers,
 } from "@tabler/icons-react";
 import { downloadAIP, parseAIPExcel } from "@/lib/aipExport";
-import { downloadMonitoringTemplateMapped } from "@/lib/monitoringExport";
+import { downloadMonitoring } from "@/lib/monitoringExportRevamp";
 import { useSession } from "next-auth/react";
 
 type ActiveDataset = "aip" | "monitoring";
@@ -1446,11 +1446,15 @@ export default function ProjectTable({
   };
 
   const exportMonitoring = (): void => {
-    downloadMonitoringTemplateMapped(
+    const debugValidate =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("debugExport") === "1";
+    downloadMonitoring(
       filteredMonitoring,
       `monitoring_${monitoringYear === "All" ? "all-years" : monitoringYear}.xlsx`,
       {
         fallbackToCsv: true,
+        debugValidate,
       },
     );
   };
@@ -1471,7 +1475,7 @@ export default function ProjectTable({
       >
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <h1 className="text-xl font-bold text-(--primary)">
+            <h1 className="text-xl font-bold text-primary">
               {mode === "aip" ? "Annual Investment Plan" : "Project Monitoring"}
             </h1>
             <p className="text-sm text-gray-500">
