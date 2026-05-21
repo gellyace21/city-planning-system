@@ -10,3 +10,37 @@
 - Super Admin: superadmin@example.com superadmin
   > [!TIP]
   > use https://bcrypt-generator.com/ for changing passwords in db
+
+# TODO
+
+## System
+
+- [ ] Fix monitoring export
+- [ ] add super admin login bg gradient
+- [ ] Add lead links manager icons to buttons
+- [ ] Add loading states
+
+## External
+
+- [x] Start neon database
+  - [x] Import database tables/fields (Neon PgSQL)
+  - [x] Create CDN or a host for the profile pictures (Cloudflare R2 - 10gb Storage)
+  - [ ] Connect Neon and R2 to system
+- [ ] Host online
+
+# Current Features
+
+- Super admin
+  - Create admin accounts
+- Admin
+  - Account
+    - Change name
+    - Change password
+  - AIP/Monitoring
+    - (**AIP**) export
+    - import (lead uploads)
+    - print
+    - comments
+- Lead
+  - Upload
+  - Basic CRUD
