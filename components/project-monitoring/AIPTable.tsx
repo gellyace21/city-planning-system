@@ -455,7 +455,10 @@ export default function AIPTable({
       ref={tableWrapRef}
       className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
     >
-      <div ref={scrollRef} className="max-h-[70vh] overflow-auto">
+      <div
+        ref={scrollRef}
+        className="table-container-aip max-h-[60vh] overflow-auto"
+      >
         <table className="min-w-full w-max table-fixed text-[12px] border-collapse [&_th]:align-top [&_td]:align-top [&_td]:wrap-break-word [&_td]:whitespace-normal">
           <colgroup>
             {columnWidths.map((width, index) => (
@@ -991,6 +994,24 @@ export default function AIPTable({
             </tr>
           </tfoot>
         </table>
+      </div>
+
+      <div className="border-t border-gray-100 bg-gray-50 px-3 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+            Sectors
+          </span>
+          {["All", ...allSectors].map((sector) => (
+            <button
+              key={sector}
+              type="button"
+              onClick={() => onSectorFilterChange(sector)}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${sectorFilter === sector ? "bg-sky-600 text-white shadow-sm" : "border border-gray-200 bg-white text-gray-700 hover:bg-sky-50"}`}
+            >
+              {sector}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

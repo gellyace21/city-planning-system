@@ -256,10 +256,17 @@ export default function ProjectTable({
   } | null>(null);
   const [commentDraft, setCommentDraft] = useState<string>("");
   const [commentSubmitting, setCommentSubmitting] = useState<boolean>(false);
+  const [selectedCommentKey, setSelectedCommentKey] = useState<string | null>(
+    null,
+  );
+  const [commentSidebarMode, setCommentSidebarMode] = useState<
+    "row" | "file" | "all" | null
+  >(null);
 
   const [undoStack, setUndoStack] = useState<ChangeOperation[]>([]);
   const [redoStack, setRedoStack] = useState<ChangeOperation[]>([]);
   const historyPanelRef = useRef<HTMLDivElement | null>(null);
+  const commentItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const [aipRows, setAipRows] = useState<AIPRow[]>(initialAipRows);
   const [aipStatusTab, setAipStatusTab] = useState<StatusTab>("all");
@@ -666,6 +673,62 @@ export default function ProjectTable({
       .filter((comment) => comment.file_id === fileCommentTarget.id)
       .sort((a, b) => a.created_at.localeCompare(b.created_at));
   }, [fileComments, fileCommentTarget]);
+
+  const commentSidebarTitle = useMemo(() => {
+    if (commentSidebarMode === "all") {
+      return "All Comments";
+    }
+    if (commentTarget) {
+      return `Comments - Row ${commentTarget.rowId} · ${commentTarget.field}`;
+    }
+    if (fileCommentTarget) {
+      return `File Comments - ${fileCommentTarget.file_name}`;
+    }
+    return "Comments";
+  }, [commentSidebarMode, commentTarget, fileCommentTarget]);
+
+  const activeCommentList = useMemo(() => {
+    if (commentSidebarMode === "all") return scopedComments;
+    if (commentSidebarMode === "row") return commentThread;
+    if (commentSidebarMode === "file") return fileCommentThread;
+    return [];
+  }, [commentSidebarMode, scopedComments, commentThread, fileCommentThread]);
+
+  const activeCommentKeyPrefix = commentSidebarMode ?? "none";
+
+  useEffect(() => {
+    if (!selectedCommentKey) return;
+    const target = commentItemRefs.current[selectedCommentKey];
+    if (!target) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [selectedCommentKey]);
+
+  useEffect(() => {
+    if (activeCommentList.length === 0) {
+      setSelectedCommentKey(null);
+      return;
+    }
+
+    const hasSelection = selectedCommentKey
+      ? activeCommentList.some(
+          (comment) =>
+            `${activeCommentKeyPrefix}:${comment.id}` === selectedCommentKey,
+        )
+      : false;
+
+    if (!hasSelection) {
+      setSelectedCommentKey(
+        `${activeCommentKeyPrefix}:${activeCommentList[0].id}`,
+      );
+    }
+  }, [activeCommentList, activeCommentKeyPrefix, selectedCommentKey]);
 
   const refreshComments = async (): Promise<void> => {
     try {
@@ -1296,13 +1359,18 @@ export default function ProjectTable({
     rowId: number,
     field: keyof AIPRow | keyof MonitoringRow | "__row__",
   ): void => {
+    setCommentSidebarMode("row");
     setCommentTarget({ rowId, field: String(field) });
+    setFileCommentTarget(null);
     setCommentDraft("");
+    setSelectedCommentKey(null);
   };
 
   const closeComments = (): void => {
+    setCommentSidebarMode(null);
     setCommentTarget(null);
     setCommentDraft("");
+    setSelectedCommentKey(null);
   };
 
   const submitComment = async (): Promise<void> => {
@@ -1329,13 +1397,25 @@ export default function ProjectTable({
   };
 
   const openFileComments = (file: LeadFileSummary): void => {
+    setCommentSidebarMode("file");
     setFileCommentTarget(file);
+    setCommentTarget(null);
     setFileCommentDraft("");
+    setSelectedCommentKey(null);
   };
 
   const closeFileComments = (): void => {
+    setCommentSidebarMode(null);
     setFileCommentTarget(null);
     setFileCommentDraft("");
+    setSelectedCommentKey(null);
+  };
+
+  const openAllCommentsSidebar = (): void => {
+    setCommentSidebarMode("all");
+    setCommentTarget(null);
+    setFileCommentTarget(null);
+    setSelectedCommentKey(null);
   };
 
   const submitFileComment = async (): Promise<void> => {
@@ -1476,7 +1556,7 @@ export default function ProjectTable({
   return (
     <div className="min-h-screen relative py-15">
       <div
-        className={`max-w-screen mx-auto px-0 py-0 space-y-4 transition-all duration-200 ease-in-out ${showHistory ? "mr-74 w-[80vw]" : showLeadHistory ? "ml-50 w-[85vw]" : "mr-0 ml-0 w-[90vw]"} "}`}
+        className={`max-w-screen mx-auto px-0 py-0 space-y-4 transition-all duration-200 ease-in-out ${showHistory && showLeadHistory ? "mr-120 w-[68vw]" : showHistory || showLeadHistory ? "mr-74 w-[80vw]" : "mr-0 ml-0 w-[90vw]"}`}
       >
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
@@ -1566,7 +1646,7 @@ export default function ProjectTable({
         {isAdmin && (
           <div
             ref={historyPanelRef}
-            className={`bg-white border fixed ${showHistory ? "right-0" : "-right-100"} duration-200 ease-in-out top-25 border-gray-200 rounded-2xl shadow-sm overflow-hidden h-full z-1`}
+            className={`bg-white border fixed w-96 ${showHistory ? "right-0" : "-right-96"} duration-200 ease-in-out top-25 border-gray-200 rounded-2xl shadow-sm overflow-hidden h-full z-20`}
           >
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
               <h2 className="text-sm font-bold text-gray-900">
@@ -1650,13 +1730,12 @@ export default function ProjectTable({
         {mode === "aip" ? (
           <>
             {(isLead || isAdmin) && (
-              // Lead Upload Section - turn into sidebar
               <div
-                className={`lead-upload absolute w-60 p-4 rounded-xl border border-gray-200 bg-white transition-all duration-300 ease-in-out z-10 ${showLeadHistory ? "left-15" : "-left-150"}`}
+                className={`lead-upload fixed w-96 bg-white border rounded-2xl shadow-sm overflow-hidden h-full z-10 top-25 border-gray-200 duration-200 ease-in-out ${showLeadHistory ? (showHistory ? "right-98" : "right-0") : "-right-96"}`}
               >
-                <div className="flex flex-wrap gap-3 items-center justify-between">
+                <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-sm font-semibold text-gray-800">
+                    <h2 className="text-sm font-bold text-gray-900">
                       {isLead ? "Upload AIP .xlsx" : "Lead Uploaded AIP Files"}
                     </h2>
                     <p className="text-xs text-gray-500">
@@ -1681,13 +1760,13 @@ export default function ProjectTable({
                   )}
                 </div>
 
-                <div className="mt-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-gray-700">
+                <div className="h-[calc(100%-4.5rem)] overflow-y-auto px-4 py-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                       Uploaded files
                     </p>
                     {selectedUpload ? (
-                      <span className="text-[11px] font-semibold text-sky-700 bg-sky-50 border border-sky-100 px-2 py-1 rounded-lg flex items-center gap-2">
+                      <span className="text-[11px] font-semibold text-sky-700 bg-sky-50 border border-sky-100 px-2 py-1 rounded-lg flex items-center gap-2 flex-wrap justify-end text-right">
                         Viewing: {selectedUpload.file_name}
                         {selectedUpload.lead_username
                           ? ` · ${selectedUpload.lead_username}`
@@ -1716,7 +1795,7 @@ export default function ProjectTable({
                             key={department}
                             className="rounded-xl border border-gray-100 bg-gray-50 p-3"
                           >
-                            <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center justify-between mb-2 gap-2">
                               <span className="text-xs font-semibold text-gray-700">
                                 {department}
                               </span>
@@ -1918,9 +1997,13 @@ export default function ProjectTable({
                   </option>
                 ))}
               </select>
-              <span className="px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={openAllCommentsSidebar}
+                className="px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-xs font-semibold hover:bg-amber-100 transition-colors"
+              >
                 Comments: {scopedComments.length}
-              </span>
+              </button>
               {selectedUpload ? (
                 <span className="px-3 py-2 rounded-xl border border-sky-200 bg-sky-50 text-sky-700 text-xs font-semibold flex items-center gap-2">
                   {selectedUpload.file_name}
@@ -2028,9 +2111,13 @@ export default function ProjectTable({
                   </option>
                 ))}
               </select>
-              <span className="px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={openAllCommentsSidebar}
+                className="px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-xs font-semibold hover:bg-amber-100 transition-colors"
+              >
                 Comments: {scopedComments.length}
-              </span>
+              </button>
               <button
                 onClick={exportMonitoring}
                 className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold"
@@ -2161,33 +2248,37 @@ export default function ProjectTable({
         </div>
       )}
 
-      {commentTarget && (
-        <div
-          className="fixed inset-0 bg-black/30 z-30 flex items-center justify-center p-4"
-          onClick={closeComments}
-        >
-          <div
-            className="w-full max-w-xl bg-white rounded-2xl border border-gray-200 shadow-xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-gray-900">Comments</h3>
-                <p className="text-xs text-gray-500">
-                  Row {commentTarget.rowId} · {commentTarget.field}
-                </p>
-              </div>
-              <button
-                onClick={closeComments}
-                className="text-sm text-gray-500 hover:text-gray-700"
-              >
-                Close
-              </button>
+      {commentSidebarMode && (
+        <aside className="fixed right-4 top-24 bottom-4 z-30 flex w-96 max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+          <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+            <div>
+              <h3 className="text-sm font-bold text-gray-900">
+                {commentSidebarTitle}
+              </h3>
+              <p className="text-xs text-gray-500">
+                Click a comment to focus it
+              </p>
             </div>
+            <button
+              onClick={() => {
+                if (commentSidebarMode === "row") {
+                  closeComments();
+                } else if (commentSidebarMode === "file") {
+                  closeFileComments();
+                } else {
+                  setCommentSidebarMode(null);
+                }
+              }}
+              className="text-sm text-gray-500 hover:text-gray-700"
+            >
+              Close
+            </button>
+          </div>
 
-            <div className="px-5 py-4 space-y-3">
+          {commentSidebarMode === "row" && commentTarget && (
+            <div className="border-b border-gray-100 px-5 py-3">
               <div className="flex items-center gap-2">
-                <label className="text-xs font-semibold text-gray-600 uppercase">
+                <label className="text-xs font-semibold uppercase text-gray-600">
                   Target
                 </label>
                 <select
@@ -2197,7 +2288,7 @@ export default function ProjectTable({
                       prev ? { ...prev, field: e.target.value } : prev,
                     )
                   }
-                  className="px-2 py-1 text-sm rounded border border-gray-300"
+                  className="rounded border border-gray-300 px-2 py-1 text-sm"
                 >
                   {commentFields.map((field) => (
                     <option key={field} value={field}>
@@ -2206,65 +2297,99 @@ export default function ProjectTable({
                   ))}
                 </select>
               </div>
+            </div>
+          )}
 
-              <div className="max-h-64 overflow-auto border border-gray-100 rounded-xl">
-                {commentThread.length === 0 ? (
-                  <p className="px-4 py-6 text-sm text-gray-400">
-                    No comments for this target yet.
-                  </p>
-                ) : (
-                  commentThread.map((comment) => (
-                    <div
-                      key={comment.id}
-                      className="px-4 py-3 border-b border-gray-100"
-                    >
-                      <div className="flex items-start gap-2">
-                        {comment.created_by_avatar ? (
-                          <img
-                            src={comment.created_by_avatar}
-                            alt={comment.created_by_name}
-                            className="w-7 h-7 rounded-full object-cover"
-                            title={`${comment.created_by_name} (${comment.created_by_role})`}
-                          />
-                        ) : (
-                          <div
-                            className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold flex items-center justify-center"
-                            title={`${comment.created_by_name} (${comment.created_by_role})`}
-                          >
-                            {makeInitials(comment.created_by_name)}
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <p className="text-xs text-gray-500">
-                            {comment.created_by_name} ({comment.created_by_role}
-                            ) · {new Date(comment.created_at).toLocaleString()}
-                          </p>
-                          <p className="text-sm text-gray-800 whitespace-pre-wrap">
-                            {comment.comment_text}
-                          </p>
-                        </div>
-                      </div>
+          <div className="flex-1 overflow-y-auto px-2 py-2">
+            {activeCommentList.length === 0 ? (
+              <p className="px-3 py-6 text-sm text-gray-400">
+                No comments yet.
+              </p>
+            ) : (
+              activeCommentList.map((comment) => {
+                const commentKey = `${activeCommentKeyPrefix}:${comment.id}`;
+                const isSelected = selectedCommentKey === commentKey;
+                const commentScopeLabel =
+                  commentSidebarMode === "row"
+                    ? `${comment.entity_name === "aip_rows" ? "AIP" : "Monitoring"} · Row ${comment.row_id} · ${comment.column_name}`
+                    : commentSidebarMode === "file"
+                      ? `File · ${fileCommentTarget?.file_name ?? "Unknown file"}`
+                      : `${comment.entity_name === "aip_rows" ? "AIP" : "Monitoring"} · Row ${comment.row_id} · ${comment.column_name}`;
+
+                return (
+                  <div
+                    key={comment.id}
+                    ref={(node) => {
+                      commentItemRefs.current[commentKey] = node;
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      setSelectedCommentKey(commentKey);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelectedCommentKey(commentKey);
+                      }
+                    }}
+                    className={`px-4 py-3 text-sm border-b border-gray-100 cursor-pointer transition-colors ${isSelected ? "bg-sky-50 ring-1 ring-sky-200" : "hover:bg-gray-50"}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-gray-800">
+                        {commentSidebarMode === "row"
+                          ? comment.entity_name === "aip_rows"
+                            ? "AIP"
+                            : "Monitoring"
+                          : commentSidebarMode === "file"
+                            ? "File Comment"
+                            : comment.entity_name === "aip_rows"
+                              ? "AIP"
+                              : "Monitoring"}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(comment.created_at).toLocaleString()}
+                      </span>
                     </div>
-                  ))
-                )}
-              </div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      {commentScopeLabel}
+                    </div>
+                    <div className="mt-1 text-xs text-gray-700 whitespace-pre-wrap">
+                      {comment.comment_text}
+                    </div>
+                    {commentSidebarMode === "all" ? (
+                      <div className="mt-2 inline-flex rounded bg-gray-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500 border border-gray-200">
+                        {comment.created_by_name} ({comment.created_by_role})
+                      </div>
+                    ) : (
+                      <div className="mt-2 text-[11px] text-gray-500">
+                        {comment.created_by_name} ({comment.created_by_role})
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
 
-              {isAdmin ? (
+          <div className="border-t border-gray-100 px-5 py-4">
+            {commentSidebarMode === "row" && commentTarget ? (
+              isAdmin ? (
                 <>
                   <textarea
                     value={commentDraft}
                     onChange={(e) => setCommentDraft(e.target.value)}
                     rows={3}
                     placeholder="Add a comment..."
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                   />
-                  <div className="flex justify-end">
+                  <div className="mt-3 flex justify-end">
                     <button
                       onClick={() => {
                         void submitComment();
                       }}
                       disabled={commentSubmitting || !commentDraft.trim()}
-                      className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold disabled:opacity-50"
+                      className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
                     >
                       {commentSubmitting ? "Saving..." : "Add Comment"}
                     </button>
@@ -2274,91 +2399,18 @@ export default function ProjectTable({
                 <p className="text-xs text-gray-500">
                   Comments are admin-only. You can view existing comments here.
                 </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {fileCommentTarget && (
-        <div
-          className="fixed inset-0 bg-black/30 z-30 flex items-center justify-center p-4"
-          onClick={closeFileComments}
-        >
-          <div
-            className="w-full max-w-xl bg-white rounded-2xl border border-gray-200 shadow-xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-gray-900">
-                  File Comments
-                </h3>
-                <p className="text-xs text-gray-500">
-                  {fileCommentTarget.file_name}
-                </p>
-              </div>
-              <button
-                onClick={closeFileComments}
-                className="text-sm text-gray-500 hover:text-gray-700"
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="px-5 py-4 space-y-3">
-              <div className="max-h-64 overflow-auto border border-gray-100 rounded-xl">
-                {fileCommentThread.length === 0 ? (
-                  <p className="px-4 py-6 text-sm text-gray-400">
-                    No comments for this file yet.
-                  </p>
-                ) : (
-                  fileCommentThread.map((comment) => (
-                    <div
-                      key={comment.id}
-                      className="px-4 py-3 border-b border-gray-100"
-                    >
-                      <div className="flex items-start gap-2">
-                        {comment.created_by_avatar ? (
-                          <img
-                            src={comment.created_by_avatar}
-                            alt={comment.created_by_name}
-                            className="w-7 h-7 rounded-full object-cover"
-                            title={`${comment.created_by_name} (${comment.created_by_role})`}
-                          />
-                        ) : (
-                          <div
-                            className="w-7 h-7 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold flex items-center justify-center"
-                            title={`${comment.created_by_name} (${comment.created_by_role})`}
-                          >
-                            {makeInitials(comment.created_by_name)}
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <p className="text-xs text-gray-500">
-                            {comment.created_by_name} ({comment.created_by_role}
-                            ) · {new Date(comment.created_at).toLocaleString()}
-                          </p>
-                          <p className="text-sm text-gray-800 whitespace-pre-wrap">
-                            {comment.comment_text}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {isAdmin ? (
+              )
+            ) : commentSidebarMode === "file" ? (
+              isAdmin ? (
                 <>
                   <textarea
                     value={fileCommentDraft}
                     onChange={(e) => setFileCommentDraft(e.target.value)}
                     rows={3}
                     placeholder="Add a file comment..."
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                   />
-                  <div className="flex justify-end">
+                  <div className="mt-3 flex justify-end">
                     <button
                       onClick={() => {
                         void submitFileComment();
@@ -2366,7 +2418,7 @@ export default function ProjectTable({
                       disabled={
                         fileCommentSubmitting || !fileCommentDraft.trim()
                       }
-                      className="px-3 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold disabled:opacity-50"
+                      className="rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
                     >
                       {fileCommentSubmitting ? "Saving..." : "Add Comment"}
                     </button>
@@ -2377,10 +2429,15 @@ export default function ProjectTable({
                   File comments are admin-only. You can view existing comments
                   here.
                 </p>
-              )}
-            </div>
+              )
+            ) : (
+              <p className="text-xs text-gray-500">
+                Browse the comment list above. Click a comment to keep it in
+                view.
+              </p>
+            )}
           </div>
-        </div>
+        </aside>
       )}
 
       <style jsx global>{`

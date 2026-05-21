@@ -285,7 +285,10 @@ export default function MonitoringTable({
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <div ref={scrollRef} className="max-h-[70vh] overflow-auto">
+      <div
+        ref={scrollRef}
+        className="table0container-monitoring max-h-[60vh] overflow-auto"
+      >
         <table className="min-w-full w-max table-fixed text-[15px] border-collapse [&_th]:align-top [&_td]:align-top [&_td]:wrap-break-word [&_td]:whitespace-normal">
           <colgroup>
             {columnWidths.map((width, index) => (
