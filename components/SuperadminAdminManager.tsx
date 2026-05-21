@@ -13,6 +13,9 @@ type AdminRecord = {
 };
 
 export default function SuperadminAdminManager(): React.JSX.Element {
+  const [activeTab, setActiveTab] = useState<
+    "manage" | "register" | "archived"
+  >("manage");
   const [admins, setAdmins] = useState<AdminRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
@@ -35,9 +38,8 @@ export default function SuperadminAdminManager(): React.JSX.Element {
         admins?: AdminRecord[];
         error?: string;
       };
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(data.error || "Failed to load admin accounts.");
-      }
       setAdmins(data.admins ?? []);
     } catch (err) {
       setError(
@@ -68,14 +70,14 @@ export default function SuperadminAdminManager(): React.JSX.Element {
         }),
       });
       const data = (await response.json()) as { error?: string };
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(data.error || "Failed to create account.");
-      }
       setName("");
       setEmail("");
       setPassword("");
       setProfilePic("");
       setIsSuperadmin(false);
+      setActiveTab("manage");
       await loadAdmins();
     } catch (err) {
       setError(
@@ -93,9 +95,8 @@ export default function SuperadminAdminManager(): React.JSX.Element {
         body: JSON.stringify({ id: record.id, is_active: !record.is_active }),
       });
       const data = (await response.json()) as { error?: string };
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(data.error || "Failed to update account.");
-      }
       await loadAdmins();
     } catch (err) {
       setError(
@@ -116,9 +117,8 @@ export default function SuperadminAdminManager(): React.JSX.Element {
         }),
       });
       const data = (await response.json()) as { error?: string };
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(data.error || "Failed to update account.");
-      }
       await loadAdmins();
     } catch (err) {
       setError(
@@ -132,7 +132,6 @@ export default function SuperadminAdminManager(): React.JSX.Element {
       setError("Super admin accounts cannot be deleted.");
       return;
     }
-
     setError("");
     setDeleteLoading(true);
     try {
@@ -140,9 +139,8 @@ export default function SuperadminAdminManager(): React.JSX.Element {
         method: "DELETE",
       });
       const data = (await response.json()) as { error?: string };
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(data.error || "Failed to delete account.");
-      }
       setPendingDelete(null);
       await loadAdmins();
     } catch (err) {
@@ -154,154 +152,310 @@ export default function SuperadminAdminManager(): React.JSX.Element {
     }
   };
 
+  const activeAdmins = admins.filter((a) => a.is_active);
+  const archivedAdmins = admins.filter((a) => !a.is_active);
+
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-6 mt-16">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Super Admin Control Panel
-        </h1>
-        <p className="text-sm text-gray-500">
-          Create and manage admin accounts with full authentication control.
-        </p>
-      </div>
-
-      {error && (
-        <div className="px-4 py-2 rounded-lg text-sm text-red-700 bg-red-50 border border-red-200">
-          {error}
-        </div>
-      )}
-
-      <form
-        onSubmit={(event) => {
-          void createAdmin(event);
-        }}
-        className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-white border border-gray-200 rounded-xl p-4"
-      >
-        <input
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder="Full name"
-          className="px-3 py-2 rounded border border-gray-300 text-sm"
-          required
-        />
-        <input
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="Email"
-          type="email"
-          className="px-3 py-2 rounded border border-gray-300 text-sm"
-          required
-        />
-        <input
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          placeholder="Temporary password"
-          type="password"
-          className="px-3 py-2 rounded border border-gray-300 text-sm"
-          required
-        />
-        <input
-          value={profilePic}
-          onChange={(event) => setProfilePic(event.target.value)}
-          placeholder="Profile photo URL (optional)"
-          className="px-3 py-2 rounded border border-gray-300 text-sm"
-        />
-        <label className="flex items-center gap-2 text-sm text-gray-700">
-          <input
-            type="checkbox"
-            checked={isSuperadmin}
-            onChange={(event) => setIsSuperadmin(event.target.checked)}
-          />
-          Create as Super Admin
-        </label>
-        <div className="flex justify-end">
+    <div className="min-h-screen flex flex-col justify-center items-center gap-10 bg-emerald-50 py-10">
+      <h1 className="text-primary text-3xl font-bold font-josefin">
+        Welcome, Super Admin
+      </h1>
+      <div className="h-[60vh] w-[60vw] mx-auto max-w-5xl bg-white border border-gray-200 rounded-sm shadow-sm">
+        {/* Tabs */}
+        <div className="flex items-center border-b border-gray-200 px-4 py-2 gap-1">
           <button
-            type="submit"
-            className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold"
+            onClick={() => setActiveTab("manage")}
+            className={`text-xs font-bold px-4 py-1.5 ${activeTab === "manage" ? "bg-emerald-700" : "bg-emerald-600"} text-white`}
           >
-            Create Account
+            MANAGE STAFF
           </button>
-        </div>
-      </form>
-
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-gray-900">Admin Accounts</h2>
           <button
-            onClick={() => {
-              void loadAdmins();
-            }}
-            className="text-sm text-sky-700 font-semibold"
+            onClick={() => setActiveTab("register")}
+            className={`text-xs font-bold px-4 py-1.5 ${activeTab === "register" ? "bg-sky-600" : "bg-sky-500"} text-white`}
           >
-            Refresh
+            REGISTER REQUEST
+          </button>
+          <button
+            onClick={() => setActiveTab("archived")}
+            className={`text-xs font-bold px-4 py-1.5 ${activeTab === "archived" ? "bg-gray-500" : "bg-gray-400"} text-white`}
+          >
+            ARCHIVED STAFF
           </button>
         </div>
 
-        {loading ? (
-          <p className="px-4 py-5 text-sm text-gray-500">Loading accounts...</p>
-        ) : admins.length === 0 ? (
-          <p className="px-4 py-5 text-sm text-gray-500">
-            No admin accounts found.
-          </p>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {admins.map((record) => (
-              <div
-                key={record.id}
-                className="px-4 py-3 flex items-center justify-between gap-3"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate">
-                    {record.name}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {record.email} ·{" "}
-                    {record.is_superadmin ? "Super Admin" : "Admin"}
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    Created {new Date(record.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      void toggleRole(record);
-                    }}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200"
-                  >
-                    {record.is_superadmin
-                      ? "Set as Admin"
-                      : "Set as Super Admin"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      void toggleStatus(record);
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                      record.is_active
-                        ? "bg-red-50 text-red-700 border border-red-200"
-                        : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                    }`}
-                  >
-                    {record.is_active ? "Deactivate" : "Activate"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPendingDelete(record);
-                    }}
-                    disabled={record.is_superadmin}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white disabled:opacity-50"
-                  >
-                    Delete
-                  </button>
-                </div>
+        {/* Controls bar — shown on manage & archived tabs */}
+        {activeTab !== "register" && (
+          <div className="px-6 py-4 flex items-center">
+            {/* Centered search */}
+            <div className="flex-1 flex justify-center">
+              <div className="w-2/3 flex">
+                <input
+                  type="text"
+                  placeholder="Search Name, Position"
+                  className="w-full border border-gray-300 rounded-l px-3 py-2 text-sm focus:outline-none"
+                />
+                <button className="bg-emerald-400 hover:bg-emerald-500 text-white px-3 py-2 rounded-r text-sm">
+                  🔍
+                </button>
               </div>
-            ))}
+            </div>
+            {/* Right actions */}
+            <div className="flex items-center gap-5">
+              <button
+                onClick={() => setActiveTab("register")}
+                className="text-xs font-semibold flex items-center gap-1.5 text-gray-700"
+              >
+                ADD STAFF
+                <span className="bg-emerald-400 text-white rounded-full w-5 h-5 flex items-center justify-center text-base leading-none">
+                  +
+                </span>
+              </button>
+              <span className="text-sm text-gray-600 cursor-pointer select-none">
+                Sort by ⤓
+              </span>
+              <div className="flex items-center gap-2 text-xs text-gray-600">
+                <label>SELECT ALL</label>
+                <input type="checkbox" className="w-4 h-4" />
+                <button className="bg-red-500 text-white text-xs px-3 py-1 rounded ml-1">
+                  ARCHIVE
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Error banner */}
+        {error && (
+          <div className="mx-6 mb-2 px-4 py-2 rounded text-sm text-red-700 bg-red-50 border border-red-200">
+            {error}
+          </div>
+        )}
+
+        {/* ── MANAGE STAFF TAB ── */}
+        {activeTab === "manage" && (
+          <div className="px-6 pb-10">
+            {loading ? (
+              <p className="py-10 text-center text-sm text-gray-500">
+                Loading...
+              </p>
+            ) : (
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="text-left text-xs text-gray-500 border-t border-b">
+                    <th className="py-3 px-4 font-semibold">Name</th>
+                    <th className="py-3 px-4 font-semibold">Position</th>
+                    <th className="py-3 px-4 font-semibold">Email/Contact</th>
+                    <th className="py-3 px-4 font-semibold">Date Added</th>
+                    <th className="py-3 px-4 font-semibold">Status</th>
+                    <th className="py-3 px-4" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeAdmins.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="py-12 text-center text-gray-400"
+                      >
+                        No active staff found.
+                      </td>
+                    </tr>
+                  ) : (
+                    activeAdmins.map((record) => (
+                      <tr key={record.id} className="border-b hover:bg-gray-50">
+                        <td className="py-4 px-4 text-xs font-bold uppercase text-gray-900">
+                          {record.name}
+                        </td>
+                        <td className="py-4 px-4 text-xs text-gray-500">
+                          {record.is_superadmin
+                            ? "Full control of the system"
+                            : "Admin"}
+                        </td>
+                        <td className="py-4 px-4 text-xs text-gray-500">
+                          {record.email}
+                        </td>
+                        <td className="py-4 px-4 text-xs text-gray-500">
+                          {new Date(record.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="inline-block bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold">
+                            ACTIVE
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <input type="checkbox" className="w-4 h-4" />
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+
+        {/* ── REGISTER REQUEST TAB ── */}
+        {activeTab === "register" && (
+          <div className="px-6 py-6">
+            <h2 className="text-sm font-bold text-gray-800 mb-4">
+              Register New Staff
+            </h2>
+            <form
+              onSubmit={(e) => {
+                void createAdmin(e);
+              }}
+              className="grid grid-cols-1 md:grid-cols-2 gap-3"
+            >
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Full name"
+                className="px-3 py-2 rounded border border-gray-300 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                required
+              />
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email"
+                type="email"
+                className="px-3 py-2 rounded border border-gray-300 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                required
+              />
+              <input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Temporary password"
+                type="password"
+                className="px-3 py-2 rounded border border-gray-300 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                required
+              />
+              <input
+                value={profilePic}
+                onChange={(e) => setProfilePic(e.target.value)}
+                placeholder="Profile photo URL (optional)"
+                className="px-3 py-2 rounded border border-gray-300 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              />
+              <label className="flex items-center gap-2 text-sm text-gray-700 col-span-1">
+                <input
+                  type="checkbox"
+                  checked={isSuperadmin}
+                  onChange={(e) => setIsSuperadmin(e.target.checked)}
+                />
+                Create as Super Admin
+              </label>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("manage")}
+                  className="px-4 py-2 rounded border border-gray-300 text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold"
+                >
+                  Create Account
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* ── ARCHIVED STAFF TAB ── */}
+        {activeTab === "archived" && (
+          <div className="px-6 pb-10">
+            {loading ? (
+              <p className="py-10 text-center text-sm text-gray-500">
+                Loading...
+              </p>
+            ) : (
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="text-left text-xs text-gray-500 border-t border-b">
+                    <th className="py-3 px-4 font-semibold">Name</th>
+                    <th className="py-3 px-4 font-semibold">Position</th>
+                    <th className="py-3 px-4 font-semibold">Email/Contact</th>
+                    <th className="py-3 px-4 font-semibold">Date Added</th>
+                    <th className="py-3 px-4 font-semibold">Status</th>
+                    <th className="py-3 px-4 font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {archivedAdmins.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="py-12 text-center text-gray-400"
+                      >
+                        No archived staff found.
+                      </td>
+                    </tr>
+                  ) : (
+                    archivedAdmins.map((record) => (
+                      <tr key={record.id} className="border-b hover:bg-gray-50">
+                        <td className="py-4 px-4 text-xs font-bold uppercase text-gray-900">
+                          {record.name}
+                        </td>
+                        <td className="py-4 px-4 text-xs text-gray-500">
+                          {record.is_superadmin
+                            ? "Full control of the system"
+                            : "Admin"}
+                        </td>
+                        <td className="py-4 px-4 text-xs text-gray-500">
+                          {record.email}
+                        </td>
+                        <td className="py-4 px-4 text-xs text-gray-500">
+                          {new Date(record.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="inline-block bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-xs font-bold">
+                            ARCHIVED
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                void toggleRole(record);
+                              }}
+                              className="px-2 py-1 rounded text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200"
+                            >
+                              {record.is_superadmin
+                                ? "Set Admin"
+                                : "Set Super Admin"}
+                            </button>
+                            <button
+                              onClick={() => {
+                                void toggleStatus(record);
+                              }}
+                              className="px-2 py-1 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            >
+                              Activate
+                            </button>
+                            <button
+                              onClick={() => {
+                                setPendingDelete(record);
+                              }}
+                              disabled={record.is_superadmin}
+                              className="px-2 py-1 rounded text-xs font-semibold bg-red-600 text-white disabled:opacity-40"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
         )}
       </div>
 
-      {pendingDelete ? (
+      {/* Delete confirmation modal */}
+      {pendingDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-xl">
             <h3 className="text-base font-bold text-gray-900">
@@ -313,7 +467,6 @@ export default function SuperadminAdminManager(): React.JSX.Element {
             </p>
             <div className="mt-5 flex items-center justify-end gap-2">
               <button
-                type="button"
                 onClick={() => setPendingDelete(null)}
                 disabled={deleteLoading}
                 className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 disabled:opacity-60"
@@ -321,7 +474,6 @@ export default function SuperadminAdminManager(): React.JSX.Element {
                 Cancel
               </button>
               <button
-                type="button"
                 onClick={() => {
                   void deleteAdmin(pendingDelete);
                 }}
@@ -333,7 +485,7 @@ export default function SuperadminAdminManager(): React.JSX.Element {
             </div>
           </div>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
