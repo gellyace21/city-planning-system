@@ -105,6 +105,16 @@ const isValidDateInput = (value: string): boolean => {
 
 const normalizeCode = (value: string): string => value.trim().toLowerCase();
 
+function isCommentRow(c: CommentEntry | FileCommentEntry): c is CommentEntry {
+  return (
+    c &&
+    typeof c === "object" &&
+    "entity_name" in c &&
+    "row_id" in c &&
+    "column_name" in c
+  );
+}
+
 const getAipClientIssues = (
   row: AIPRow,
   allRows: AIPRow[],
@@ -2311,12 +2321,27 @@ export default function ProjectTable({
             activeCommentList.map((comment) => {
               const commentKey = `${activeCommentKeyPrefix}:${comment.id}`;
               const isSelected = selectedCommentKey === commentKey;
-              const commentScopeLabel =
-                commentSidebarMode === "row"
-                  ? `${comment.entity_name === "aip_rows" ? "AIP" : "Monitoring"} · Row ${comment.row_id} · ${comment.column_name}`
-                  : commentSidebarMode === "file"
-                    ? `File · ${fileCommentTarget?.file_name ?? "Unknown file"}`
-                    : `${comment.entity_name === "aip_rows" ? "AIP" : "Monitoring"} · Row ${comment.row_id} · ${comment.column_name}`;
+              const isRowComment = isCommentRow(comment);
+              let commentScopeLabel = "";
+              if (commentSidebarMode === "row") {
+                if (isRowComment) {
+                  const { entity_name, row_id, column_name } =
+                    comment as CommentEntry;
+                  commentScopeLabel = `${entity_name === "aip_rows" ? "AIP" : "Monitoring"} · Row ${row_id} · ${column_name}`;
+                } else {
+                  commentScopeLabel = "Row comment";
+                }
+              } else if (commentSidebarMode === "file") {
+                commentScopeLabel = `File · ${fileCommentTarget?.file_name ?? "Unknown file"}`;
+              } else {
+                if (isRowComment) {
+                  const { entity_name, row_id, column_name } =
+                    comment as CommentEntry;
+                  commentScopeLabel = `${entity_name === "aip_rows" ? "AIP" : "Monitoring"} · Row ${row_id} · ${column_name}`;
+                } else {
+                  commentScopeLabel = "Row comment";
+                }
+              }
 
               return (
                 <div
@@ -2328,6 +2353,21 @@ export default function ProjectTable({
                   tabIndex={0}
                   onClick={() => {
                     setSelectedCommentKey(commentKey);
+                    if (isRowComment) {
+                      const rowId = (comment as CommentEntry).row_id;
+                      setFocusedAipRowId(rowId);
+                      window.setTimeout(() => {
+                        const target = document.getElementById(
+                          `aip-row-${rowId}`,
+                        );
+                        if (target)
+                          target.scrollIntoView({
+                            behavior: "smooth",
+                            block: "center",
+                          });
+                      }, 50);
+                      window.setTimeout(() => setFocusedAipRowId(null), 900);
+                    }
                   }}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
@@ -2339,15 +2379,26 @@ export default function ProjectTable({
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-semibold text-gray-800">
-                      {commentSidebarMode === "row"
-                        ? comment.entity_name === "aip_rows"
-                          ? "AIP"
-                          : "Monitoring"
-                        : commentSidebarMode === "file"
-                          ? "File Comment"
-                          : comment.entity_name === "aip_rows"
+                      {(() => {
+                        if (commentSidebarMode === "row") {
+                          if (isRowComment) {
+                            const { entity_name } = comment as CommentEntry;
+                            return entity_name === "aip_rows"
+                              ? "AIP"
+                              : "Monitoring";
+                          }
+                          return "Row";
+                        }
+                        if (commentSidebarMode === "file")
+                          return "File Comment";
+                        if (isRowComment) {
+                          const { entity_name } = comment as CommentEntry;
+                          return entity_name === "aip_rows"
                             ? "AIP"
-                            : "Monitoring"}
+                            : "Monitoring";
+                        }
+                        return "Row";
+                      })()}
                     </span>
                     <span className="text-xs text-gray-500">
                       {new Date(comment.created_at).toLocaleString()}

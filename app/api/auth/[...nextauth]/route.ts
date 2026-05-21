@@ -124,7 +124,7 @@ export const authOptions: AuthOptions = {
       }
       return session;
     },
-    async jwt({ token, user }: { token: JWT; user?: AuthUser }) {
+    async jwt({ token, user }: { token: JWT; user?: any }) {
       if (user) {
         token.id = user.id;
         token.role = user.role;

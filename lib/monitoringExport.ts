@@ -210,7 +210,7 @@ export function downloadMonitoringTemplateMapped(
     try {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(
-        toArrayBufferFromBase64(MONITORING_TEMPLATE_BASE64),
+        toArrayBufferFromBase64(MONITORING_TEMPLATE_BASE64.join("")),
       );
       const ws = resolveTemplateWorksheet(workbook);
       if (!ws) {
@@ -318,7 +318,7 @@ export function downloadMonitoringTemplateMapped(
 //     try {
 //       const workbook = new ExcelJS.Workbook();
 //       await workbook.xlsx.load(
-//         toArrayBufferFromBase64(MONITORING_TEMPLATE_BASE64),
+//         toArrayBufferFromBase64(MONITORING_TEMPLATE_BASE64.join("")),
 //       );
 
 //       const ws = workbook.worksheets[0]; // direct index — sheet is "Non-Infrastructure Projects"

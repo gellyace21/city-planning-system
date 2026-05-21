@@ -27,7 +27,11 @@ type LeadUploadedFile = {
   lead_department?: string;
 };
 
-export default function LeadLinksManager(): React.JSX.Element | null {
+export default function LeadLinksManager({
+  compact,
+}: {
+  compact?: boolean;
+}): React.JSX.Element | null {
   const { data: session, status } = useSession();
   const isAdminView = ["admin", "superadmin"].includes(
     session?.user?.role || "",
@@ -234,7 +238,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
 
   return (
     <section
-      className="link-section"
+      className={`link-section ${compact ? "compact" : ""}`}
       aria-label="Implementation link generator"
     >
       <style jsx>{`
@@ -246,6 +250,26 @@ export default function LeadLinksManager(): React.JSX.Element | null {
           // width: min(860px, 100%);
           width: auto;
           background: var(--background-plain);
+        }
+
+        .link-section.compact {
+          gap: 6px;
+        }
+
+        .link-section.compact .link-label {
+          padding: 6px 10px;
+          font-size: 11px;
+        }
+
+        .link-section.compact .link-input {
+          padding: 6px 8px;
+          font-size: 12px;
+        }
+
+        .link-section.compact .generate-btn {
+          height: 32px;
+          padding: 0 10px;
+          font-size: 11px;
         }
 
         .lead-row {
@@ -844,7 +868,7 @@ export default function LeadLinksManager(): React.JSX.Element | null {
                       >
                         {department}
                       </span>
-                      <span className="department-meta font-bold text-(--primary)">
+                      <span className="department-meta font-bold text-primary">
                         {entries.length} lead{entries.length > 1 ? "s" : ""}
                       </span>
                     </div>

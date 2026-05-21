@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import LeadLinksManager from "@/components/LeadLinksManager";
 
 type AdminRecord = {
   id: number;
@@ -13,9 +14,7 @@ type AdminRecord = {
 };
 
 export default function SuperadminAdminManager(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<
-    "manage" | "register" | "archived"
-  >("manage");
+  const [activeTab, setActiveTab] = useState<"manage" | "archived">("manage");
   const [admins, setAdmins] = useState<AdminRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
@@ -160,7 +159,7 @@ export default function SuperadminAdminManager(): React.JSX.Element {
       <h1 className="text-primary text-3xl font-bold font-josefin">
         Welcome, Super Admin
       </h1>
-      <div className="h-[60vh] w-[60vw] mx-auto max-w-5xl bg-white border border-gray-200 rounded-sm shadow-sm">
+      <div className="h-[75vh] w-[85vw] mx-auto max-w-7xl bg-white border border-gray-200 rounded-sm shadow-sm flex flex-col">
         {/* Tabs */}
         <div className="flex items-center border-b border-gray-200 px-4 py-2 gap-1">
           <button
@@ -169,12 +168,7 @@ export default function SuperadminAdminManager(): React.JSX.Element {
           >
             MANAGE STAFF
           </button>
-          <button
-            onClick={() => setActiveTab("register")}
-            className={`text-xs font-bold px-4 py-1.5 ${activeTab === "register" ? "bg-sky-600" : "bg-sky-500"} text-white`}
-          >
-            REGISTER REQUEST
-          </button>
+
           <button
             onClick={() => setActiveTab("archived")}
             className={`text-xs font-bold px-4 py-1.5 ${activeTab === "archived" ? "bg-gray-500" : "bg-gray-400"} text-white`}
@@ -184,45 +178,6 @@ export default function SuperadminAdminManager(): React.JSX.Element {
         </div>
 
         {/* Controls bar — shown on manage & archived tabs */}
-        {activeTab !== "register" && (
-          <div className="px-6 py-4 flex items-center">
-            {/* Centered search */}
-            <div className="flex-1 flex justify-center">
-              <div className="w-2/3 flex">
-                <input
-                  type="text"
-                  placeholder="Search Name, Position"
-                  className="w-full border border-gray-300 rounded-l px-3 py-2 text-sm focus:outline-none"
-                />
-                <button className="bg-emerald-400 hover:bg-emerald-500 text-white px-3 py-2 rounded-r text-sm">
-                  🔍
-                </button>
-              </div>
-            </div>
-            {/* Right actions */}
-            <div className="flex items-center gap-5">
-              <button
-                onClick={() => setActiveTab("register")}
-                className="text-xs font-semibold flex items-center gap-1.5 text-gray-700"
-              >
-                ADD STAFF
-                <span className="bg-emerald-400 text-white rounded-full w-5 h-5 flex items-center justify-center text-base leading-none">
-                  +
-                </span>
-              </button>
-              <span className="text-sm text-gray-600 cursor-pointer select-none">
-                Sort by ⤓
-              </span>
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <label>SELECT ALL</label>
-                <input type="checkbox" className="w-4 h-4" />
-                <button className="bg-red-500 text-white text-xs px-3 py-1 rounded ml-1">
-                  ARCHIVE
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Error banner */}
         {error && (
@@ -233,138 +188,78 @@ export default function SuperadminAdminManager(): React.JSX.Element {
 
         {/* ── MANAGE STAFF TAB ── */}
         {activeTab === "manage" && (
-          <div className="px-6 pb-10">
+          <div className="px-6 pb-6 overflow-y-auto flex-1">
             {loading ? (
               <p className="py-10 text-center text-sm text-gray-500">
                 Loading...
               </p>
             ) : (
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="text-left text-xs text-gray-500 border-t border-b">
-                    <th className="py-3 px-4 font-semibold">Name</th>
-                    <th className="py-3 px-4 font-semibold">Position</th>
-                    <th className="py-3 px-4 font-semibold">Email/Contact</th>
-                    <th className="py-3 px-4 font-semibold">Date Added</th>
-                    <th className="py-3 px-4 font-semibold">Status</th>
-                    <th className="py-3 px-4" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeAdmins.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className="py-12 text-center text-gray-400"
-                      >
-                        No active staff found.
-                      </td>
+              <>
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="text-left text-xs text-gray-500 border-t border-b">
+                      <th className="py-3 px-4 font-semibold">Name</th>
+                      <th className="py-3 px-4 font-semibold">Position</th>
+                      <th className="py-3 px-4 font-semibold">Email/Contact</th>
+                      <th className="py-3 px-4 font-semibold">Date Added</th>
+                      <th className="py-3 px-4 font-semibold">Status</th>
+                      <th className="py-3 px-4" />
                     </tr>
-                  ) : (
-                    activeAdmins.map((record) => (
-                      <tr key={record.id} className="border-b hover:bg-gray-50">
-                        <td className="py-4 px-4 text-xs font-bold uppercase text-gray-900">
-                          {record.name}
-                        </td>
-                        <td className="py-4 px-4 text-xs text-gray-500">
-                          {record.is_superadmin
-                            ? "Full control of the system"
-                            : "Admin"}
-                        </td>
-                        <td className="py-4 px-4 text-xs text-gray-500">
-                          {record.email}
-                        </td>
-                        <td className="py-4 px-4 text-xs text-gray-500">
-                          {new Date(record.created_at).toLocaleDateString()}
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className="inline-block bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold">
-                            ACTIVE
-                          </span>
-                        </td>
-                        <td className="py-4 px-4">
-                          <input type="checkbox" className="w-4 h-4" />
+                  </thead>
+                  <tbody>
+                    {activeAdmins.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="py-12 text-center text-gray-400"
+                        >
+                          No active staff found.
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      activeAdmins.map((record) => (
+                        <tr
+                          key={record.id}
+                          className="border-b hover:bg-gray-50"
+                        >
+                          <td className="py-4 px-4 text-xs font-bold uppercase text-gray-900">
+                            {record.name}
+                          </td>
+                          <td className="py-4 px-4 text-xs text-gray-500">
+                            {record.is_superadmin
+                              ? "Full control of the system"
+                              : "Admin"}
+                          </td>
+                          <td className="py-4 px-4 text-xs text-gray-500">
+                            {record.email}
+                          </td>
+                          <td className="py-4 px-4 text-xs text-gray-500">
+                            {new Date(record.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="py-4 px-4">
+                            <span className="inline-block bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold">
+                              ACTIVE
+                            </span>
+                          </td>
+                          <td className="py-4 px-4">
+                            <input type="checkbox" className="w-4 h-4" />
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+                <div className="mt-6">
+                  <LeadLinksManager compact />
+                </div>
+              </>
             )}
-          </div>
-        )}
-
-        {/* ── REGISTER REQUEST TAB ── */}
-        {activeTab === "register" && (
-          <div className="px-6 py-6">
-            <h2 className="text-sm font-bold text-gray-800 mb-4">
-              Register New Staff
-            </h2>
-            <form
-              onSubmit={(e) => {
-                void createAdmin(e);
-              }}
-              className="grid grid-cols-1 md:grid-cols-2 gap-3"
-            >
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Full name"
-                className="px-3 py-2 rounded border border-gray-300 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                required
-              />
-              <input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email"
-                type="email"
-                className="px-3 py-2 rounded border border-gray-300 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                required
-              />
-              <input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Temporary password"
-                type="password"
-                className="px-3 py-2 rounded border border-gray-300 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                required
-              />
-              <input
-                value={profilePic}
-                onChange={(e) => setProfilePic(e.target.value)}
-                placeholder="Profile photo URL (optional)"
-                className="px-3 py-2 rounded border border-gray-300 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
-              />
-              <label className="flex items-center gap-2 text-sm text-gray-700 col-span-1">
-                <input
-                  type="checkbox"
-                  checked={isSuperadmin}
-                  onChange={(e) => setIsSuperadmin(e.target.checked)}
-                />
-                Create as Super Admin
-              </label>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("manage")}
-                  className="px-4 py-2 rounded border border-gray-300 text-sm text-gray-600 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold"
-                >
-                  Create Account
-                </button>
-              </div>
-            </form>
           </div>
         )}
 
         {/* ── ARCHIVED STAFF TAB ── */}
         {activeTab === "archived" && (
-          <div className="px-6 pb-10">
+          <div className="px-6 pb-10 overflow-y-auto flex-1">
             {loading ? (
               <p className="py-10 text-center text-sm text-gray-500">
                 Loading...

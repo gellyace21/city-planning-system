@@ -368,7 +368,15 @@ export default function AIPTable({
     return (
       <td
         className={`${className} ${statusClass} ${commentClass} cursor-pointer group relative`}
-        onDoubleClick={() => startEdit(row.id, field, value)}
+        onDoubleClick={() =>
+          startEdit(
+            row.id,
+            field,
+            (value ?? (AIP_NUMERIC_FIELDS.has(field) ? 0 : "")) as
+              | string
+              | number,
+          )
+        }
         title="Double-click to edit"
       >
         <span className="group-hover:bg-sky-50 rounded px-0.5 transition-colors">

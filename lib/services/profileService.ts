@@ -37,8 +37,8 @@ export interface UserProfileResponse {
 }
 
 interface DbShape {
-  admins?: AdminProfile[];
-  leads?: LeadProfile[];
+  admins: AdminProfile[];
+  leads: LeadProfile[];
 }
 
 async function readDb(): Promise<DbShape> {
