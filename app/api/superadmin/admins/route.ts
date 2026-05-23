@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import bcrypt from "bcryptjs";
-import { readAppState, writeAppState } from "@/lib/appState";
+import { sql } from "@/lib/db";
 
 type DbAdmin = {
   id: number;
@@ -15,11 +15,6 @@ type DbAdmin = {
   is_superadmin?: boolean;
 };
 
-type DbShape = {
-  admins?: DbAdmin[];
-  [key: string]: unknown;
-};
-
 const requireSuperAdmin = async (): Promise<NextResponse | null> => {
   const session = await getServerSession(authOptions);
   if (session?.user?.role !== "superadmin") {
@@ -28,21 +23,17 @@ const requireSuperAdmin = async (): Promise<NextResponse | null> => {
   return null;
 };
 
-const readDb = async (): Promise<DbShape> => {
-  const db = await readAppState<DbShape>();
-  return { admins: db.admins ?? [] };
-};
-
-const writeDb = async (db: DbShape): Promise<void> => {
-  await writeAppState(db);
-};
-
 export async function GET() {
   const authError = await requireSuperAdmin();
   if (authError) return authError;
 
-  const db = await readDb();
-  const admins = (db.admins ?? []).map((admin) => ({
+  const rows = (await sql`
+    SELECT id, name, email, password_hash, created_at, is_active, profile_pic, is_superadmin, phone
+    FROM admins
+    ORDER BY id ASC
+  `) as DbAdmin[];
+
+  const admins = rows.map((admin) => ({
     id: admin.id,
     name: admin.name,
     email: admin.email,
@@ -78,32 +69,33 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const db = await readDb();
-  const admins = db.admins ?? [];
+  const existing = (await sql`
+    SELECT id
+    FROM admins
+    WHERE email = ${email}
+    LIMIT 1
+  `) as Array<{ id: number }>;
 
-  if (admins.some((admin) => admin.email.toLowerCase() === email)) {
+  if (existing.length > 0) {
     return NextResponse.json(
       { error: "An account with this email already exists." },
       { status: 409 },
     );
   }
 
-  const nextId = admins.reduce((max, admin) => Math.max(max, admin.id), 0) + 1;
   const password_hash = await bcrypt.hash(password, 10);
 
-  admins.push({
-    id: nextId,
-    name,
-    email,
-    password_hash,
-    created_at: new Date().toISOString(),
-    is_active: true,
-    profile_pic: body.profile_pic?.trim() || "",
-    is_superadmin: Boolean(body.is_superadmin),
-  });
-
-  db.admins = admins;
-  await writeDb(db);
+  await sql`
+    INSERT INTO admins (name, email, password_hash, profile_pic, is_superadmin, is_active)
+    VALUES (
+      ${name},
+      ${email},
+      ${password_hash},
+      ${body.profile_pic?.trim() || null},
+      ${Boolean(body.is_superadmin)},
+      true
+    )
+  `;
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }
@@ -128,22 +120,30 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  const db = await readDb();
-  const admins = db.admins ?? [];
-  const index = admins.findIndex((admin) => admin.id === Number(body.id));
+  const existing = (await sql`
+    SELECT id, name, email, is_active, profile_pic, is_superadmin, created_at
+    FROM admins
+    WHERE id = ${Number(body.id)}
+    LIMIT 1
+  `) as Array<DbAdmin>;
 
-  if (index < 0) {
+  const current = existing[0];
+
+  if (!current) {
     return NextResponse.json({ error: "Admin not found." }, { status: 404 });
   }
 
-  const current = admins[index];
   const nextEmail = body.email?.trim().toLowerCase();
   if (
     nextEmail &&
-    admins.some(
-      (admin) =>
-        admin.id !== current.id && admin.email.toLowerCase() === nextEmail,
-    )
+    (
+      await sql`
+      SELECT id
+      FROM admins
+      WHERE email = ${nextEmail} AND id <> ${current.id}
+      LIMIT 1
+    `
+    ).length > 0
   ) {
     return NextResponse.json(
       { error: "Another admin already uses this email." },
@@ -151,24 +151,16 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  admins[index] = {
-    ...current,
-    name: body.name?.trim() || current.name,
-    email: nextEmail || current.email,
-    is_active:
-      typeof body.is_active === "boolean" ? body.is_active : current.is_active,
-    profile_pic:
-      body.profile_pic !== undefined
-        ? body.profile_pic.trim()
-        : current.profile_pic,
-    is_superadmin:
-      typeof body.is_superadmin === "boolean"
-        ? body.is_superadmin
-        : current.is_superadmin,
-  };
-
-  db.admins = admins;
-  await writeDb(db);
+  await sql`
+    UPDATE admins
+    SET
+      name = ${body.name?.trim() || current.name},
+      email = ${nextEmail || current.email},
+      is_active = ${typeof body.is_active === "boolean" ? body.is_active : current.is_active},
+      profile_pic = ${body.profile_pic !== undefined ? body.profile_pic.trim() : current.profile_pic},
+      is_superadmin = ${typeof body.is_superadmin === "boolean" ? body.is_superadmin : current.is_superadmin}
+    WHERE id = ${current.id}
+  `;
 
   return NextResponse.json({ ok: true });
 }
@@ -186,9 +178,13 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  const db = await readDb();
-  const admins = db.admins ?? [];
-  const target = admins.find((admin) => admin.id === targetId);
+  const rows = (await sql`
+    SELECT id, is_superadmin
+    FROM admins
+    WHERE id = ${targetId}
+    LIMIT 1
+  `) as Array<{ id: number; is_superadmin: boolean }>;
+  const target = rows[0];
   if (!target) {
     return NextResponse.json({ error: "Admin not found." }, { status: 404 });
   }
@@ -199,7 +195,9 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  db.admins = admins.filter((admin) => admin.id !== targetId);
-  await writeDb(db);
+  await sql`
+    DELETE FROM admins
+    WHERE id = ${targetId}
+  `;
   return NextResponse.json({ ok: true });
 }

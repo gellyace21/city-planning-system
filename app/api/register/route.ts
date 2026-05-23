@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { readAppState, writeAppState } from "@/lib/appState";
+import { sql } from "@/lib/db";
 
 type RegisterBody = {
   email: string;
   password: string;
   department?: string;
+  username?: string;
 };
 
 type RegisterRequestRecord = {
@@ -21,13 +22,13 @@ type RegisterRequestRecord = {
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as RegisterBody;
-    const email = body.email?.trim();
+    const username = body.username?.trim() || body.email?.trim();
     const password = body.password;
     const department = body.department?.trim() || "General";
 
-    if (!email || !password) {
+    if (!username || !password) {
       return NextResponse.json(
-        { error: "Email and password are required" },
+        { error: "Username and password are required" },
         { status: 400 },
       );
     }
@@ -39,14 +40,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const db = await readAppState<{
-      register_requests?: RegisterRequestRecord[];
-    }>();
-    const registerRequests = db.register_requests ?? [];
-
-    const exists = registerRequests.some(
-      (u: { email: string }) => u.email.toLowerCase() === email.toLowerCase(),
-    );
+    const exists =
+      (
+        await sql`
+      SELECT id
+      FROM register_requests
+      WHERE LOWER(username) = LOWER(${username})
+      LIMIT 1
+    `
+      ).length > 0;
 
     if (exists) {
       return NextResponse.json(
@@ -56,25 +58,17 @@ export async function POST(req: NextRequest) {
     }
 
     const password_hash = await bcrypt.hash(password, 10);
-    const nextId =
-      registerRequests.length > 0
-        ? Math.max(...registerRequests.map((u: { id: number }) => u.id)) + 1
-        : 1;
 
-    registerRequests.push({
-      id: nextId,
-      token: crypto.randomUUID(),
-      email,
-      password_hash,
-      is_active: true,
-      department,
-      created_at: new Date().toISOString(),
-    });
-
-    await writeAppState({
-      ...db,
-      register_requests: registerRequests,
-    });
+    await sql`
+      INSERT INTO register_requests (token, username, password_hash, department, status)
+      VALUES (
+        ${crypto.randomUUID()},
+        ${username},
+        ${password_hash},
+        ${department},
+        'pending'
+      )
+    `;
 
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch {

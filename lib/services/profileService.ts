@@ -1,6 +1,6 @@
 import "server-only";
 
-import { readAppState, writeAppState } from "@/lib/appState";
+import { sql } from "@/lib/db";
 
 export interface AdminProfile {
   id: number;
@@ -39,30 +39,48 @@ interface DbShape {
 }
 
 async function readDb(): Promise<DbShape> {
-  try {
-    const data = await readAppState<DbShape>();
-    return {
-      admins: data.admins ?? [],
-      leads: data.leads ?? [],
-    };
-  } catch (error) {
-    console.error("Error reading Neon state:", error);
-    return { admins: [], leads: [] };
-  }
+  const [admins, leads] = await Promise.all([
+    sql`
+      SELECT id, name, email, phone, profile_pic, is_superadmin, created_at, is_active
+      FROM admins
+      ORDER BY id ASC
+    `,
+    sql`
+      SELECT id, username, department, created_at, is_active, token, password_hash
+      FROM leads
+      ORDER BY id ASC
+    `,
+  ]);
+
+  return {
+    admins: admins as AdminProfile[],
+    leads: (
+      leads as Array<LeadProfile & { token?: string; password_hash?: string }>
+    ).map((lead) => ({
+      id: lead.id,
+      username: lead.username,
+      department: lead.department,
+      created_at: lead.created_at,
+      is_active: lead.is_active,
+      email: "",
+      phone: "",
+      profile_pic: "",
+    })),
+  };
 }
 
 async function writeDb(data: DbShape): Promise<void> {
-  try {
-    await writeAppState(data);
-  } catch (error) {
-    console.error("Error writing Neon state:", error);
-    throw new Error("Failed to save profile");
-  }
+  void data;
 }
 
 export async function getAdminProfile(adminId: number): Promise<AdminProfile> {
-  const db = await readDb();
-  const admin = db.admins?.find((a: AdminProfile) => a.id === adminId);
+  const rows = (await sql`
+    SELECT id, name, email, phone, profile_pic, is_superadmin, created_at, is_active
+    FROM admins
+    WHERE id = ${adminId}
+    LIMIT 1
+  `) as Array<AdminProfile>;
+  const admin = rows[0];
 
   if (!admin) {
     throw new Error("Admin not found");
@@ -72,8 +90,13 @@ export async function getAdminProfile(adminId: number): Promise<AdminProfile> {
 }
 
 export async function getLeadProfile(leadId: number): Promise<LeadProfile> {
-  const db = await readDb();
-  const lead = db.leads?.find((l: LeadProfile) => l.id === leadId);
+  const rows = (await sql`
+    SELECT id, username, department, created_at, is_active
+    FROM leads
+    WHERE id = ${leadId}
+    LIMIT 1
+  `) as Array<LeadProfile>;
+  const lead = rows[0];
 
   if (!lead) {
     throw new Error("Lead not found");
@@ -112,42 +135,47 @@ export async function updateAdminProfile(
   adminId: number,
   updates: Partial<AdminProfile>,
 ): Promise<AdminProfile> {
-  const db = await readDb();
-  const adminIndex = db.admins?.findIndex(
-    (a: AdminProfile) => a.id === adminId,
-  );
-
-  if (adminIndex === -1 || adminIndex === undefined) {
-    throw new Error("Admin not found");
-  }
-
-  db.admins[adminIndex] = {
-    ...db.admins[adminIndex],
+  const current = await getAdminProfile(adminId);
+  const next = {
+    ...current,
     ...updates,
   };
 
-  await writeDb(db);
-  return db.admins[adminIndex];
+  await sql`
+    UPDATE admins
+    SET
+      name = ${next.name},
+      email = ${next.email},
+      phone = ${next.phone ?? null},
+      profile_pic = ${next.profile_pic ?? null},
+      is_active = ${Boolean(next.is_active)},
+      is_superadmin = ${Boolean(next.is_superadmin)}
+    WHERE id = ${adminId}
+  `;
+
+  return next;
 }
 
 export async function updateLeadProfile(
   leadId: number,
   updates: Partial<LeadProfile>,
 ): Promise<LeadProfile> {
-  const db = await readDb();
-  const leadIndex = db.leads?.findIndex((l: LeadProfile) => l.id === leadId);
-
-  if (leadIndex === -1 || leadIndex === undefined) {
-    throw new Error("Lead not found");
-  }
-
-  db.leads[leadIndex] = {
-    ...db.leads[leadIndex],
+  const current = await getLeadProfile(leadId);
+  const next = {
+    ...current,
     ...updates,
   };
 
-  await writeDb(db);
-  return db.leads[leadIndex];
+  await sql`
+    UPDATE leads
+    SET
+      username = ${next.username},
+      department = ${next.department ?? null},
+      is_active = ${Boolean(next.is_active)}
+    WHERE id = ${leadId}
+  `;
+
+  return next;
 }
 
 export async function updateUserProfileByRole(
@@ -168,7 +196,7 @@ export async function updateUserProfileByRole(
       name: lead.username,
       email: lead.email || "",
       phone: lead.phone || "",
-      profile_pic: lead.profile_pic || "",
+      profile_pic: "",
       department: lead.department || "",
     };
   }

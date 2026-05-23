@@ -1,24 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readAppState, writeAppState } from "@/lib/appState";
+import { sql } from "@/lib/db";
 
 async function readDb() {
-  return readAppState<{
-    generated_links?: Array<{
-      token: string;
-      lead_id: number;
-      last_accessed_at?: string;
-    }>;
-    leads?: Array<{
+  const [links, leads] = await Promise.all([
+    sql`
+      SELECT id, lead_id, token
+      FROM generated_links
+    `,
+    sql`
+      SELECT id, username, department, is_active
+      FROM leads
+    `,
+  ]);
+
+  return {
+    generated_links: links as Array<{ token: string; lead_id: number }>,
+    leads: leads as Array<{
       id: number;
       username: string;
       department?: string;
       is_active?: boolean;
-    }>;
-  }>();
-}
-
-async function writeDb(data: unknown) {
-  await writeAppState(data as Record<string, unknown>);
+    }>,
+  };
 }
 
 export async function GET(
@@ -131,32 +134,24 @@ export async function POST(
         );
       }
 
-      leads[leadIndex] = {
-        ...lead,
-        username,
-        is_active: true,
-      };
+      await sql`
+        UPDATE leads
+        SET username = ${username}, is_active = true
+        WHERE id = ${lead.id}
+      `;
     }
 
     if (!String(lead.department || "").trim() && department) {
-      leads[leadIndex] = {
-        ...leads[leadIndex],
-        department,
-      };
+      await sql`
+        UPDATE leads
+        SET department = ${department}
+        WHERE id = ${lead.id}
+      `;
     }
-
-    db.leads = leads;
-
-    links[linkIndex] = {
-      ...link,
-      last_accessed_at: new Date().toISOString(),
-    };
-    db.generated_links = links;
-    await writeDb(db);
 
     return NextResponse.json({
       ok: true,
-      leadUsername: leads[leadIndex]?.username || lead.username,
+      leadUsername: username || lead.username,
     });
   } catch (error) {
     console.error("Failed to access lead link:", error);

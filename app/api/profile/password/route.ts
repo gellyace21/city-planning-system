@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { readAppState, writeAppState } from "@/lib/appState";
+import { sql } from "@/lib/db";
 
 type PasswordBody = {
   id: number | string;
@@ -42,21 +42,29 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const db = await readAppState<{
-      admins?: Array<{ id: number; password_hash: string }>;
-      leads?: Array<{ id: number; password_hash: string }>;
-    }>();
-
     const isLead = role === "lead";
-    const targetCollection = isLead ? "leads" : "admins";
-    const users = db[targetCollection] ?? [];
-    const userIndex = users.findIndex((user: { id: number }) => user.id === id);
+    const user = isLead
+      ? (
+          (await sql`
+            SELECT id, password_hash
+            FROM leads
+            WHERE id = ${id}
+            LIMIT 1
+          `) as Array<{ id: number; password_hash: string }>
+        )[0]
+      : (
+          (await sql`
+            SELECT id, password_hash
+            FROM admins
+            WHERE id = ${id}
+            LIMIT 1
+          `) as Array<{ id: number; password_hash: string }>
+        )[0];
 
-    if (userIndex === -1 || userIndex === undefined) {
+    if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const user = users[userIndex];
     const passwordMatches = await bcrypt.compare(
       currentPassword,
       user.password_hash,
@@ -71,14 +79,19 @@ export async function PUT(request: NextRequest) {
 
     const password_hash = await bcrypt.hash(newPassword, 10);
 
-    users[userIndex] = {
-      ...user,
-      password_hash,
-    };
-
-    db[targetCollection] = users;
-
-    await writeAppState(db);
+    if (isLead) {
+      await sql`
+        UPDATE leads
+        SET password_hash = ${password_hash}
+        WHERE id = ${id}
+      `;
+    } else {
+      await sql`
+        UPDATE admins
+        SET password_hash = ${password_hash}
+        WHERE id = ${id}
+      `;
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {

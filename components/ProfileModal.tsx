@@ -82,6 +82,20 @@ export default function ProfileModal({
           const data = (await response.json()) as { url?: string };
           if (data.url) {
             setProfilePhoto(data.url);
+
+            if (currentAdminId) {
+              const profileResponse = await fetch(
+                `/api/profile?id=${currentAdminId}`,
+              );
+              if (profileResponse.ok) {
+                const profileData = (await profileResponse.json()) as {
+                  profile_pic?: string;
+                };
+                if (profileData.profile_pic) {
+                  setProfilePhoto(profileData.profile_pic);
+                }
+              }
+            }
           }
         } catch (uploadError) {
           setError(

@@ -7,9 +7,27 @@ import {
   MonitoringRow,
   NotificationEntry,
 } from "@/components/project-monitoring/types";
-import { readAppState, writeAppState } from "@/lib/appState";
+import {
+  MonitoringTableState,
+  readMonitoringTableState,
+  writeMonitoringTableState,
+} from "@/lib/services/projectMonitoringTableStore";
 
 interface DbShape {
+  projects?: Array<{
+    id: number;
+    project_name: string;
+    year?: number | null;
+    status?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+  }>;
+  monitoring_categories?: Array<{
+    id: number;
+    project_id?: number | null;
+    name: string;
+    created_at?: string | null;
+  }>;
   aip_rows?: RawAIPRow[];
   monitoring_rows?: RawMonitoringRow[];
   edit_history?: RawEditHistoryEntry[];
@@ -464,23 +482,28 @@ const toNotificationEntry = (raw: RawNotificationEntry): NotificationEntry => ({
 });
 
 const readDb = async (): Promise<DbShape> => {
-  const data = await readAppState<DbShape>();
+  const data = await readMonitoringTableState();
   return {
     ...data,
-    aip_rows: (data.aip_rows ?? []) as RawAIPRow[],
-    monitoring_rows: (data.monitoring_rows ?? []) as RawMonitoringRow[],
-    edit_history: (data.edit_history ?? []) as RawEditHistoryEntry[],
+    projects: data.projects ?? [],
+    monitoring_categories: data.monitoring_categories ?? [],
+    aip_rows: (data.aip_rows ?? []) as unknown as RawAIPRow[],
+    monitoring_rows: (data.monitoring_rows ??
+      []) as unknown as RawMonitoringRow[],
+    edit_history: (data.edit_history ?? []) as unknown as RawEditHistoryEntry[],
     lead_files: (data.lead_files ?? []) as RawLeadFile[],
-    file_comments: (data.file_comments ?? []) as RawFileCommentEntry[],
-    comments: (data.comments ?? []) as RawCommentEntry[],
-    notifications: (data.notifications ?? []) as RawNotificationEntry[],
+    file_comments: (data.file_comments ??
+      []) as unknown as RawFileCommentEntry[],
+    comments: (data.comments ?? []) as unknown as RawCommentEntry[],
+    notifications: (data.notifications ??
+      []) as unknown as RawNotificationEntry[],
     admins: (data.admins ?? []) as RawAdminUser[],
     leads: (data.leads ?? []) as RawLeadUser[],
   };
 };
 
 const writeDb = async (db: DbShape): Promise<void> => {
-  await writeAppState(db);
+  await writeMonitoringTableState(db as MonitoringTableState);
 };
 
 const nextId = (rows: { id: number }[]): number => {

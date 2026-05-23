@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import { Admin, Lead } from "@/types/user";
 import { Session } from "next-auth";
 import { JWT } from "next-auth/jwt";
-import { readAppState } from "@/lib/appState";
+import { sql } from "@/lib/db";
 
 declare module "next-auth" {
   interface User {
@@ -39,39 +39,46 @@ export const authOptions: AuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials) return null;
-        const db = await readAppState<{
-          admins?: Admin[];
-          leads?: Lead[];
-          generated_links?: Array<{ token: string; lead_id: number }>;
-        }>();
 
         const token = String(credentials.token || "").trim();
         if (token) {
-          const link = (db.generated_links || []).find(
-            (entry: { token: string }) => entry.token === token,
-          );
-          if (link) {
-            const lead = (db.leads || []).find(
-              (u: Lead) => u.id === link.lead_id,
-            );
-            if (lead) {
-              return {
-                id: String(lead.id),
-                name: lead.username || `Lead ${lead.id}`,
-                email: lead.username || `lead-${lead.id}`,
-                role: "lead",
-                department: lead.department,
-                profile_pic: lead.profile_pic,
-              };
-            }
+          const rows = (await sql`
+            SELECT
+              l.id,
+              l.username,
+              l.department
+            FROM generated_links gl
+            INNER JOIN leads l ON l.id = gl.lead_id
+            WHERE gl.token = ${token}
+            LIMIT 1
+          `) as Array<{
+            id: number;
+            username: string | null;
+            department: string | null;
+          }>;
+
+          const lead = rows[0];
+          if (lead) {
+            return {
+              id: String(lead.id),
+              name: lead.username || `Lead ${lead.id}`,
+              email: lead.username || `lead-${lead.id}`,
+              role: "lead",
+              department: lead.department || undefined,
+            };
           }
           return null;
         }
 
-        const superadmin = (db.admins ?? []).find(
-          (u: Admin) =>
-            u.email === credentials.email && u.is_superadmin === true,
-        );
+        const superadminRows = (await sql`
+          SELECT id, name, email, password_hash, profile_pic, is_superadmin
+          FROM admins
+          WHERE email = ${credentials.email} AND is_superadmin = true
+          LIMIT 1
+        `) as Array<
+          Admin & { password_hash: string; profile_pic?: string | null }
+        >;
+        const superadmin = superadminRows[0];
 
         if (
           superadmin &&
@@ -82,15 +89,19 @@ export const authOptions: AuthOptions = {
             name: superadmin.name,
             email: superadmin.email,
             role: "superadmin",
-            profile_pic: superadmin.profile_pic,
+            profile_pic: superadmin.profile_pic || undefined,
           };
         }
 
-        // Try admin by email
-        const user = (db.admins ?? []).find(
-          (u: Admin) =>
-            u.email === credentials.email && u.is_superadmin !== true,
-        );
+        const adminRows = (await sql`
+          SELECT id, name, email, password_hash, profile_pic, is_superadmin
+          FROM admins
+          WHERE email = ${credentials.email} AND is_superadmin <> true
+          LIMIT 1
+        `) as Array<
+          Admin & { password_hash: string; profile_pic?: string | null }
+        >;
+        const user = adminRows[0];
         if (
           user &&
           bcrypt.compareSync(credentials.password, user.password_hash)
@@ -100,11 +111,10 @@ export const authOptions: AuthOptions = {
             name: user.name,
             email: user.email,
             role: "admin",
-            profile_pic: user.profile_pic,
+            profile_pic: user.profile_pic || undefined,
           };
         }
 
-        // Invalid credentials
         return null;
       },
     }),

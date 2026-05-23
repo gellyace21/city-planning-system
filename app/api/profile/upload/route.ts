@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { updateUserProfileByRole } from "@/lib/services/profileService";
 import { uploadFile } from "@/lib/r2";
 
 export async function POST(request: NextRequest) {
@@ -27,6 +28,14 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const key = `avatars/${session.user.role}-${session.user.id}-${Date.now()}-${file.name}`;
     const url = await uploadFile(key, buffer, file.type);
+
+    const userId = Number(session.user.id);
+    if (!Number.isFinite(userId) || userId <= 0) {
+      return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });
+    }
+
+    const role = String(session.user.role);
+    await updateUserProfileByRole(userId, role, { profile_pic: url });
 
     return NextResponse.json({ url });
   } catch (error) {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { randomBytes } from "crypto";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { readAppState, writeAppState } from "@/lib/appState";
+import { sql } from "@/lib/db";
 
 type LeadLink = {
   id: number;
@@ -32,31 +32,14 @@ type LeadRecord = {
   id: number;
   username?: string;
   department?: string;
-  profile_pic?: string;
   token?: string;
   password_hash?: string;
   is_active?: boolean;
   created_at?: string;
 };
 
-async function readDb() {
-  return readAppState<{
-    generated_links?: LeadLink[];
-    lead_files?: LeadFile[];
-    leads?: LeadRecord[];
-  }>();
-}
-
-async function writeDb(data: unknown) {
-  await writeAppState(data as Record<string, unknown>);
-}
-
 function makeToken() {
   return randomBytes(16).toString("hex");
-}
-
-function nextId(rows: Array<{ id: number }>): number {
-  return rows.length > 0 ? Math.max(...rows.map((row) => row.id)) + 1 : 1;
 }
 
 export async function GET(request: NextRequest) {
@@ -69,41 +52,54 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const db = await readDb();
-    const links: LeadLink[] = db.generated_links || [];
-    const leadFiles: LeadFile[] = (db.lead_files || []) as LeadFile[];
-    const leads: LeadRecord[] = db.leads || [];
-    const leadById = new Map(leads.map((lead) => [Number(lead.id), lead]));
+    const links = (await sql`
+      SELECT
+        gl.id,
+        gl.lead_id,
+        COALESCE(l.username, '') AS lead_username,
+        gl.token,
+        gl.created_by_admin,
+        gl.created_at,
+        COALESCE(l.department, 'General') AS lead_department
+      FROM generated_links gl
+      LEFT JOIN leads l ON l.id = gl.lead_id
+      ORDER BY gl.created_at DESC
+    `) as Array<LeadLink>;
+
+    const leadFiles = (await sql`
+      SELECT
+        lf.id,
+        lf.lead_id,
+        lf.file_name,
+        lf.uploaded_at,
+        lf.row_count,
+        COALESCE(l.username, '') AS lead_username,
+        COALESCE(l.department, 'General') AS lead_department
+      FROM lead_files lf
+      LEFT JOIN leads l ON l.id = lf.lead_id
+      WHERE lf.deleted = false
+      ORDER BY lf.uploaded_at DESC
+    `) as Array<LeadFile>;
+
     const origin = request.nextUrl.origin;
 
-    const result = links
-      .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
-      .map((link) => {
-        const lead = leadById.get(Number(link.lead_id));
-        return {
-          ...link,
-          lead_username:
-            lead?.username || link.lead_username || `Lead ${link.lead_id}`,
-          lead_department: lead?.department || "General",
-          lead_profile_pic: lead?.profile_pic || "",
-          url: `${origin}/lead-access/${link.token}`,
-        };
-      });
+    const result = links.map((link) => {
+      return {
+        ...link,
+        lead_username: link.lead_username || `Lead ${link.lead_id}`,
+        lead_department: link.lead_department || "General",
+        lead_profile_pic: "",
+        url: `${origin}/lead-access/${link.token}`,
+      };
+    });
 
-    const files = leadFiles
-      .filter((file) => file.is_submitted ?? Boolean(file.submitted_at))
-      .slice()
-      .sort((a, b) =>
-        String(b.uploaded_at).localeCompare(String(a.uploaded_at)),
-      )
-      .map((file) => {
-        const lead = leadById.get(Number(file.lead_id));
-        return {
-          ...file,
-          lead_username: lead?.username || `Lead ${file.lead_id}`,
-          lead_department: lead?.department || "General",
-        };
-      });
+    const files = leadFiles.map((file) => ({
+      ...file,
+      lead_username: file.lead_username || `Lead ${file.lead_id}`,
+      lead_department: file.lead_department || "General",
+      submitted_at: file.uploaded_at,
+      is_submitted: true,
+    }));
 
     return NextResponse.json({ links: result, leadFiles: files });
   } catch (error) {
@@ -129,72 +125,58 @@ export async function POST(request: NextRequest) {
     const leadUsername = String(body?.leadUsername || "").trim();
     const hasLeadUsername = Boolean(leadUsername);
 
-    const db = await readDb();
-    const leads: LeadRecord[] = db.leads || [];
-    const links: LeadLink[] = db.generated_links || [];
-    let lead = hasLeadUsername
-      ? leads.find(
-          (entry) =>
-            String(entry.username || "").toLowerCase() ===
-            leadUsername.toLowerCase(),
-        )
-      : null;
+    const leadRows = hasLeadUsername
+      ? ((await sql`
+          SELECT id, username, department, token
+          FROM leads
+          WHERE LOWER(username) = LOWER(${leadUsername})
+          LIMIT 1
+        `) as Array<LeadRecord>)
+      : [];
+    let lead = leadRows[0] || null;
 
-    // Auto-create lead records from the admin link flow.
-    // Password is set on first token access.
     if (!lead) {
-      lead = {
-        id: nextId(leads),
-        token: makeToken(),
-        username: leadUsername || "",
-        password_hash: "",
-        is_active: true,
-        department: "",
-        created_at: new Date().toISOString(),
-      };
-      leads.push(lead);
+      const [createdLead] = (await sql`
+        INSERT INTO leads (token, username, password_hash, department, is_active)
+        VALUES (${makeToken()}, ${leadUsername || null}, '', '', true)
+        RETURNING id, username, department, token
+      `) as Array<LeadRecord>;
+      lead = createdLead;
     }
 
-    const existing = links.find((entry) => entry.lead_id === lead.id);
-
+    const existingLinks = (await sql`
+      SELECT id, lead_id, token, created_by_admin, created_at
+      FROM generated_links
+      WHERE lead_id = ${lead.id}
+      LIMIT 1
+    `) as Array<LeadLink>;
+    const existing = existingLinks[0] || null;
     const origin = request.nextUrl.origin;
 
     if (existing) {
-      db.leads = leads;
-      db.generated_links = links;
-      await writeDb(db);
       return NextResponse.json({
         link: {
           ...existing,
           lead_department: lead?.department || "General",
-          lead_profile_pic: lead?.profile_pic || "",
+          lead_profile_pic: "",
           url: `${origin}/lead-access/${existing.token}`,
           reused: true,
         },
       });
     }
 
-    const nextLinkId = nextId(links);
-
-    const newLink: LeadLink = {
-      id: nextLinkId,
-      lead_id: lead.id,
-      lead_username: lead.username || `Lead ${lead.id}`,
-      token: makeToken(),
-      created_by_admin: Number(session.user.id),
-      created_at: new Date().toISOString(),
-    };
-
-    links.push(newLink);
-    db.leads = leads;
-    db.generated_links = links;
-    await writeDb(db);
+    const [newLink] = (await sql`
+      INSERT INTO generated_links (lead_id, token, created_by_admin)
+      VALUES (${lead.id}, ${makeToken()}, ${Number(session.user.id)})
+      RETURNING id, lead_id, token, created_by_admin, created_at
+    `) as Array<LeadLink>;
 
     return NextResponse.json({
       link: {
         ...newLink,
+        lead_username: lead.username || `Lead ${lead.id}`,
         lead_department: lead?.department || "General",
-        lead_profile_pic: lead?.profile_pic || "",
+        lead_profile_pic: "",
         url: `${origin}/lead-access/${newLink.token}`,
       },
     });
@@ -229,12 +211,15 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const db = await readDb();
-    const links: LeadLink[] = db.generated_links || [];
-
     let targetLeadId = Number.isFinite(leadId) ? leadId : null;
     if (!Number.isFinite(leadId) && Number.isFinite(linkId)) {
-      const match = links.find((entry) => entry.id === linkId) || null;
+      const matchRows = (await sql`
+        SELECT lead_id
+        FROM generated_links
+        WHERE id = ${linkId}
+        LIMIT 1
+      `) as Array<{ lead_id: number }>;
+      const match = matchRows[0] || null;
       if (!match) {
         return NextResponse.json(
           { error: "Lead link not found." },
@@ -251,24 +236,28 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const leads: LeadRecord[] = db.leads || [];
-    const leadExists = leads.some((entry) => entry.id === targetLeadId);
-    if (!leadExists) {
+    const leadRows = (await sql`
+      SELECT id
+      FROM leads
+      WHERE id = ${targetLeadId}
+      LIMIT 1
+    `) as Array<{ id: number }>;
+
+    if (leadRows.length === 0) {
       return NextResponse.json(
         { error: "Lead account not found." },
         { status: 404 },
       );
     }
 
-    const remainingLeads: LeadRecord[] = leads.filter(
-      (entry) => entry.id !== targetLeadId,
-    );
-    db.leads = remainingLeads;
-    db.generated_links = links.filter(
-      (entry) => entry.lead_id !== targetLeadId,
-    );
-
-    await writeDb(db);
+    await sql`
+      DELETE FROM generated_links
+      WHERE lead_id = ${targetLeadId}
+    `;
+    await sql`
+      DELETE FROM leads
+      WHERE id = ${targetLeadId}
+    `;
 
     return NextResponse.json({ ok: true, deletedLeadId: targetLeadId });
   } catch (error) {
