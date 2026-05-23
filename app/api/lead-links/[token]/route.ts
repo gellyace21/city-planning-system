@@ -1,16 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
-
-const DB_PATH = path.join(process.cwd(), "db.json");
+import { readAppState, writeAppState } from "@/lib/appState";
 
 async function readDb() {
-  const raw = await fs.readFile(DB_PATH, "utf-8");
-  return JSON.parse(raw);
+  return readAppState<{
+    generated_links?: Array<{
+      token: string;
+      lead_id: number;
+      last_accessed_at?: string;
+    }>;
+    leads?: Array<{
+      id: number;
+      username: string;
+      department?: string;
+      is_active?: boolean;
+    }>;
+  }>();
 }
 
 async function writeDb(data: unknown) {
-  await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2), "utf-8");
+  await writeAppState(data as Record<string, unknown>);
 }
 
 export async function GET(

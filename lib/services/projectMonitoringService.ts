@@ -1,7 +1,5 @@
 import "server-only";
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import {
   AIPRow,
   CommentEntry,
@@ -9,8 +7,7 @@ import {
   MonitoringRow,
   NotificationEntry,
 } from "@/components/project-monitoring/types";
-
-const DB_PATH = path.join(process.cwd(), "db.json");
+import { readAppState, writeAppState } from "@/lib/appState";
 
 interface DbShape {
   aip_rows?: RawAIPRow[];
@@ -467,12 +464,23 @@ const toNotificationEntry = (raw: RawNotificationEntry): NotificationEntry => ({
 });
 
 const readDb = async (): Promise<DbShape> => {
-  const file = await fs.readFile(DB_PATH, "utf-8");
-  return JSON.parse(file) as DbShape;
+  const data = await readAppState<DbShape>();
+  return {
+    ...data,
+    aip_rows: (data.aip_rows ?? []) as RawAIPRow[],
+    monitoring_rows: (data.monitoring_rows ?? []) as RawMonitoringRow[],
+    edit_history: (data.edit_history ?? []) as RawEditHistoryEntry[],
+    lead_files: (data.lead_files ?? []) as RawLeadFile[],
+    file_comments: (data.file_comments ?? []) as RawFileCommentEntry[],
+    comments: (data.comments ?? []) as RawCommentEntry[],
+    notifications: (data.notifications ?? []) as RawNotificationEntry[],
+    admins: (data.admins ?? []) as RawAdminUser[],
+    leads: (data.leads ?? []) as RawLeadUser[],
+  };
 };
 
 const writeDb = async (db: DbShape): Promise<void> => {
-  await fs.writeFile(DB_PATH, `${JSON.stringify(db, null, 2)}\n`, "utf-8");
+  await writeAppState(db);
 };
 
 const nextId = (rows: { id: number }[]): number => {

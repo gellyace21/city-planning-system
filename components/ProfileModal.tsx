@@ -61,11 +61,40 @@ export default function ProfileModal({
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setProfilePhoto(event.target?.result as string);
+      const upload = async () => {
+        try {
+          setLoading(true);
+          setError("");
+
+          const formData = new FormData();
+          formData.append("file", file);
+
+          const response = await fetch("/api/profile/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const uploadError = await response.json().catch(() => null);
+            throw new Error(uploadError?.error || "Failed to upload photo");
+          }
+
+          const data = (await response.json()) as { url?: string };
+          if (data.url) {
+            setProfilePhoto(data.url);
+          }
+        } catch (uploadError) {
+          setError(
+            uploadError instanceof Error
+              ? uploadError.message
+              : "Failed to upload photo",
+          );
+        } finally {
+          setLoading(false);
+        }
       };
-      reader.readAsDataURL(file);
+
+      void upload();
     }
   };
 

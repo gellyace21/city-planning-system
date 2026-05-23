@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { promises as fs } from "fs";
-import path from "path";
 import { randomBytes } from "crypto";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { readAppState, writeAppState } from "@/lib/appState";
 
 type LeadLink = {
   id: number;
@@ -29,15 +28,25 @@ type LeadFile = {
   is_submitted?: boolean;
 };
 
-const DB_PATH = path.join(process.cwd(), "db.json");
-
 async function readDb() {
-  const raw = await fs.readFile(DB_PATH, "utf-8");
-  return JSON.parse(raw);
+  return readAppState<{
+    generated_links?: LeadLink[];
+    lead_files?: LeadFile[];
+    leads?: Array<{
+      id: number;
+      username: string;
+      department?: string;
+      profile_pic?: string;
+      token?: string;
+      password_hash?: string;
+      is_active?: boolean;
+      created_at?: string;
+    }>;
+  }>();
 }
 
 async function writeDb(data: unknown) {
-  await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2), "utf-8");
+  await writeAppState(data as Record<string, unknown>);
 }
 
 function makeToken() {

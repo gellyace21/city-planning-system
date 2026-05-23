@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
 import bcrypt from "bcryptjs";
+import { readAppState, writeAppState } from "@/lib/appState";
 
 type DbAdmin = {
   id: number;
@@ -21,8 +20,6 @@ type DbShape = {
   [key: string]: unknown;
 };
 
-const DB_PATH = path.join(process.cwd(), "db.json");
-
 const requireSuperAdmin = async (): Promise<NextResponse | null> => {
   const session = await getServerSession(authOptions);
   if (session?.user?.role !== "superadmin") {
@@ -32,12 +29,12 @@ const requireSuperAdmin = async (): Promise<NextResponse | null> => {
 };
 
 const readDb = async (): Promise<DbShape> => {
-  const raw = await readFile(DB_PATH, "utf-8");
-  return JSON.parse(raw) as DbShape;
+  const db = await readAppState<DbShape>();
+  return { admins: db.admins ?? [] };
 };
 
 const writeDb = async (db: DbShape): Promise<void> => {
-  await writeFile(DB_PATH, `${JSON.stringify(db, null, 2)}\n`, "utf-8");
+  await writeAppState(db);
 };
 
 export async function GET() {
@@ -125,7 +122,10 @@ export async function PATCH(req: NextRequest) {
   };
 
   if (!Number.isFinite(body.id)) {
-    return NextResponse.json({ error: "Admin id is required." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Admin id is required." },
+      { status: 400 },
+    );
   }
 
   const db = await readDb();
@@ -141,7 +141,8 @@ export async function PATCH(req: NextRequest) {
   if (
     nextEmail &&
     admins.some(
-      (admin) => admin.id !== current.id && admin.email.toLowerCase() === nextEmail,
+      (admin) =>
+        admin.id !== current.id && admin.email.toLowerCase() === nextEmail,
     )
   ) {
     return NextResponse.json(
@@ -157,7 +158,9 @@ export async function PATCH(req: NextRequest) {
     is_active:
       typeof body.is_active === "boolean" ? body.is_active : current.is_active,
     profile_pic:
-      body.profile_pic !== undefined ? body.profile_pic.trim() : current.profile_pic,
+      body.profile_pic !== undefined
+        ? body.profile_pic.trim()
+        : current.profile_pic,
     is_superadmin:
       typeof body.is_superadmin === "boolean"
         ? body.is_superadmin
@@ -177,7 +180,10 @@ export async function DELETE(req: NextRequest) {
   const idParam = req.nextUrl.searchParams.get("id");
   const targetId = Number(idParam);
   if (!Number.isFinite(targetId)) {
-    return NextResponse.json({ error: "Admin id is required." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Admin id is required." },
+      { status: 400 },
+    );
   }
 
   const db = await readDb();

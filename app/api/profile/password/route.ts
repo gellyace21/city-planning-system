@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { readFile, writeFile } from "fs/promises";
-import path from "path";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { readAppState, writeAppState } from "@/lib/appState";
 
 type PasswordBody = {
   id: number | string;
@@ -43,9 +42,10 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const dbPath = path.join(process.cwd(), "db.json");
-    const raw = await readFile(dbPath, "utf-8");
-    const db = JSON.parse(raw);
+    const db = await readAppState<{
+      admins?: Array<{ id: number; password_hash: string }>;
+      leads?: Array<{ id: number; password_hash: string }>;
+    }>();
 
     const isLead = role === "lead";
     const targetCollection = isLead ? "leads" : "admins";
@@ -77,7 +77,7 @@ export async function PUT(request: NextRequest) {
       password_hash,
     };
 
-    await writeFile(dbPath, JSON.stringify(db, null, 2), "utf-8");
+    await writeAppState(db);
 
     return NextResponse.json({ ok: true });
   } catch (error) {

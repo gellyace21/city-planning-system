@@ -1,9 +1,6 @@
 import "server-only";
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
-
-const DB_PATH = path.join(process.cwd(), "db.json");
+import { readAppState, writeAppState } from "@/lib/appState";
 
 export interface AdminProfile {
   id: number;
@@ -43,19 +40,22 @@ interface DbShape {
 
 async function readDb(): Promise<DbShape> {
   try {
-    const data = await fs.readFile(DB_PATH, "utf-8");
-    return JSON.parse(data) as DbShape;
+    const data = await readAppState<DbShape>();
+    return {
+      admins: data.admins ?? [],
+      leads: data.leads ?? [],
+    };
   } catch (error) {
-    console.error("Error reading db.json:", error);
+    console.error("Error reading Neon state:", error);
     return { admins: [], leads: [] };
   }
 }
 
 async function writeDb(data: DbShape): Promise<void> {
   try {
-    await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2), "utf-8");
+    await writeAppState(data);
   } catch (error) {
-    console.error("Error writing to db.json:", error);
+    console.error("Error writing Neon state:", error);
     throw new Error("Failed to save profile");
   }
 }

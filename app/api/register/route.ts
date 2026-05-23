@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, writeFile } from "fs/promises";
-import path from "path";
 import bcrypt from "bcryptjs";
+import { readAppState, writeAppState } from "@/lib/appState";
 
 type RegisterBody = {
   email: string;
@@ -30,11 +29,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const dbPath = path.join(process.cwd(), "db.json");
-    const raw = await readFile(dbPath, "utf-8");
-    const db = JSON.parse(raw);
+    const db = await readAppState<{
+      register_requests?: Array<{ id: number; email: string }>;
+    }>();
+    const registerRequests = db.register_requests ?? [];
 
-    const exists = db.register_requests.some(
+    const exists = registerRequests.some(
       (u: { email: string }) => u.email.toLowerCase() === email.toLowerCase(),
     );
 
@@ -47,11 +47,11 @@ export async function POST(req: NextRequest) {
 
     const password_hash = await bcrypt.hash(password, 10);
     const nextId =
-      db.register_requests.length > 0
-        ? Math.max(...db.register_requests.map((u: { id: number }) => u.id)) + 1
+      registerRequests.length > 0
+        ? Math.max(...registerRequests.map((u: { id: number }) => u.id)) + 1
         : 1;
 
-    db.register_requests.push({
+    registerRequests.push({
       id: nextId,
       token: crypto.randomUUID(),
       email,
@@ -61,7 +61,10 @@ export async function POST(req: NextRequest) {
       created_at: new Date().toISOString(),
     });
 
-    await writeFile(dbPath, JSON.stringify(db, null, 2), "utf-8");
+    await writeAppState({
+      ...db,
+      register_requests: registerRequests,
+    });
 
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch {
