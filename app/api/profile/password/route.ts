@@ -49,15 +49,14 @@ export async function PUT(request: NextRequest) {
 
     const isLead = role === "lead";
     const targetCollection = isLead ? "leads" : "admins";
-    const userIndex = db[targetCollection]?.findIndex(
-      (user: { id: number }) => user.id === id,
-    );
+    const users = db[targetCollection] ?? [];
+    const userIndex = users.findIndex((user: { id: number }) => user.id === id);
 
     if (userIndex === -1 || userIndex === undefined) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const user = db[targetCollection][userIndex];
+    const user = users[userIndex];
     const passwordMatches = await bcrypt.compare(
       currentPassword,
       user.password_hash,
@@ -72,10 +71,12 @@ export async function PUT(request: NextRequest) {
 
     const password_hash = await bcrypt.hash(newPassword, 10);
 
-    db[targetCollection][userIndex] = {
+    users[userIndex] = {
       ...user,
       password_hash,
     };
+
+    db[targetCollection] = users;
 
     await writeAppState(db);
 

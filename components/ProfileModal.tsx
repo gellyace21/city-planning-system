@@ -32,7 +32,7 @@ export default function ProfileModal({
     password === confirmPassword;
 
   // Get admin ID from session or props
-  const currentAdminId = adminId || (session?.user?.id as number);
+  const currentAdminId = adminId || Number(session?.user?.id);
 
   // Fetch admin profile on modal open
   useEffect(() => {

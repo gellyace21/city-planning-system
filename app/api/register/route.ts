@@ -8,6 +8,16 @@ type RegisterBody = {
   department?: string;
 };
 
+type RegisterRequestRecord = {
+  id: number;
+  token: string;
+  email: string;
+  password_hash: string;
+  is_active: boolean;
+  department: string;
+  created_at: string;
+};
+
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as RegisterBody;
@@ -30,7 +40,7 @@ export async function POST(req: NextRequest) {
     }
 
     const db = await readAppState<{
-      register_requests?: Array<{ id: number; email: string }>;
+      register_requests?: RegisterRequestRecord[];
     }>();
     const registerRequests = db.register_requests ?? [];
 

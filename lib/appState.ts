@@ -48,11 +48,11 @@ async function ensureState(): Promise<void> {
       )
     `;
 
-    const rows = await sql<{ data: AppState }>`
+    const rows = (await sql`
       SELECT data
       FROM app_state
       WHERE id = ${STATE_ID}
-    `;
+    `) as Array<{ data: AppState }>;
 
     if (rows.length === 0) {
       const seed = await readSeedState();
@@ -69,23 +69,19 @@ async function ensureState(): Promise<void> {
   return initPromise;
 }
 
-export async function readAppState<
-  T extends AppState = AppState,
->(): Promise<T> {
+export async function readAppState<T = AppState>(): Promise<T> {
   await ensureState();
 
-  const rows = await sql<{ data: T }>`
+  const rows = (await sql`
     SELECT data
     FROM app_state
     WHERE id = ${STATE_ID}
-  `;
+  `) as Array<{ data: T }>;
 
   return rows[0]?.data ?? ({} as T);
 }
 
-export async function writeAppState<T extends AppState = AppState>(
-  data: T,
-): Promise<void> {
+export async function writeAppState<T = AppState>(data: T): Promise<void> {
   await ensureState();
 
   await sql`

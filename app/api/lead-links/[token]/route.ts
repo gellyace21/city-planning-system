@@ -91,10 +91,11 @@ export async function POST(
     }
 
     const link = links[linkIndex];
-    const leadIndex = (db.leads || []).findIndex(
+    const leads = db.leads || [];
+    const leadIndex = leads.findIndex(
       (entry: { id: number }) => entry.id === link.lead_id,
     );
-    const lead = leadIndex >= 0 ? db.leads[leadIndex] : null;
+    const lead = leadIndex >= 0 ? leads[leadIndex] : null;
 
     if (!lead) {
       return NextResponse.json(
@@ -118,7 +119,7 @@ export async function POST(
     }
 
     if (username && !lead.username) {
-      const existing = (db.leads || []).find(
+      const existing = leads.find(
         (entry: { username: string; id: number }) =>
           entry.username?.toLowerCase() === username.toLowerCase() &&
           entry.id !== lead.id,
@@ -130,7 +131,7 @@ export async function POST(
         );
       }
 
-      db.leads[leadIndex] = {
+      leads[leadIndex] = {
         ...lead,
         username,
         is_active: true,
@@ -138,21 +139,24 @@ export async function POST(
     }
 
     if (!String(lead.department || "").trim() && department) {
-      db.leads[leadIndex] = {
-        ...db.leads[leadIndex],
+      leads[leadIndex] = {
+        ...leads[leadIndex],
         department,
       };
     }
 
-    db.generated_links[linkIndex] = {
+    db.leads = leads;
+
+    links[linkIndex] = {
       ...link,
       last_accessed_at: new Date().toISOString(),
     };
+    db.generated_links = links;
     await writeDb(db);
 
     return NextResponse.json({
       ok: true,
-      leadUsername: db.leads[leadIndex]?.username || lead.username,
+      leadUsername: leads[leadIndex]?.username || lead.username,
     });
   } catch (error) {
     console.error("Failed to access lead link:", error);

@@ -28,20 +28,22 @@ type LeadFile = {
   is_submitted?: boolean;
 };
 
+type LeadRecord = {
+  id: number;
+  username?: string;
+  department?: string;
+  profile_pic?: string;
+  token?: string;
+  password_hash?: string;
+  is_active?: boolean;
+  created_at?: string;
+};
+
 async function readDb() {
   return readAppState<{
     generated_links?: LeadLink[];
     lead_files?: LeadFile[];
-    leads?: Array<{
-      id: number;
-      username: string;
-      department?: string;
-      profile_pic?: string;
-      token?: string;
-      password_hash?: string;
-      is_active?: boolean;
-      created_at?: string;
-    }>;
+    leads?: LeadRecord[];
   }>();
 }
 
@@ -70,12 +72,7 @@ export async function GET(request: NextRequest) {
     const db = await readDb();
     const links: LeadLink[] = db.generated_links || [];
     const leadFiles: LeadFile[] = (db.lead_files || []) as LeadFile[];
-    const leads: Array<{
-      id: number;
-      username: string;
-      department?: string;
-      profile_pic?: string;
-    }> = db.leads || [];
+    const leads: LeadRecord[] = db.leads || [];
     const leadById = new Map(leads.map((lead) => [Number(lead.id), lead]));
     const origin = request.nextUrl.origin;
 
@@ -133,14 +130,13 @@ export async function POST(request: NextRequest) {
     const hasLeadUsername = Boolean(leadUsername);
 
     const db = await readDb();
-    if (!db.leads) {
-      db.leads = [];
-    }
-    const leads = db.leads || [];
+    const leads: LeadRecord[] = db.leads || [];
+    const links: LeadLink[] = db.generated_links || [];
     let lead = hasLeadUsername
       ? leads.find(
-          (entry: { username: string; id: number }) =>
-            entry.username.toLowerCase() === leadUsername.toLowerCase(),
+          (entry) =>
+            String(entry.username || "").toLowerCase() ===
+            leadUsername.toLowerCase(),
         )
       : null;
 
@@ -156,20 +152,17 @@ export async function POST(request: NextRequest) {
         department: "",
         created_at: new Date().toISOString(),
       };
-      db.leads.push(lead);
+      leads.push(lead);
     }
 
-    if (!db.generated_links) {
-      db.generated_links = [];
-    }
-
-    const existing = (db.generated_links as LeadLink[]).find(
-      (entry) => entry.lead_id === lead.id,
-    );
+    const existing = links.find((entry) => entry.lead_id === lead.id);
 
     const origin = request.nextUrl.origin;
 
     if (existing) {
+      db.leads = leads;
+      db.generated_links = links;
+      await writeDb(db);
       return NextResponse.json({
         link: {
           ...existing,
@@ -181,18 +174,20 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const nextLinkId = nextId(db.generated_links as LeadLink[]);
+    const nextLinkId = nextId(links);
 
     const newLink: LeadLink = {
       id: nextLinkId,
       lead_id: lead.id,
-      lead_username: lead.username,
+      lead_username: lead.username || `Lead ${lead.id}`,
       token: makeToken(),
-      created_by_admin: session.user.id,
+      created_by_admin: Number(session.user.id),
       created_at: new Date().toISOString(),
     };
 
-    db.generated_links.push(newLink);
+    links.push(newLink);
+    db.leads = leads;
+    db.generated_links = links;
     await writeDb(db);
 
     return NextResponse.json({
@@ -256,7 +251,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const leads: Array<{ id: number }> = db.leads || [];
+    const leads: LeadRecord[] = db.leads || [];
     const leadExists = leads.some((entry) => entry.id === targetLeadId);
     if (!leadExists) {
       return NextResponse.json(
@@ -265,7 +260,10 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    db.leads = leads.filter((entry) => entry.id !== targetLeadId);
+    const remainingLeads: LeadRecord[] = leads.filter(
+      (entry) => entry.id !== targetLeadId,
+    );
+    db.leads = remainingLeads;
     db.generated_links = links.filter(
       (entry) => entry.lead_id !== targetLeadId,
     );

@@ -8,9 +8,16 @@ import { JWT } from "next-auth/jwt";
 import { readAppState } from "@/lib/appState";
 
 declare module "next-auth" {
+  interface User {
+    id: string;
+    role: string;
+    profile_pic?: string;
+    department?: string;
+  }
+
   interface Session {
     user: {
-      id: number;
+      id: string;
       role: string;
       profile_pic?: string;
       department?: string;
@@ -49,7 +56,7 @@ export const authOptions: AuthOptions = {
             );
             if (lead) {
               return {
-                id: lead.id,
+                id: String(lead.id),
                 name: lead.username || `Lead ${lead.id}`,
                 email: lead.username || `lead-${lead.id}`,
                 role: "lead",
@@ -71,7 +78,7 @@ export const authOptions: AuthOptions = {
           bcrypt.compareSync(credentials.password, superadmin.password_hash)
         ) {
           return {
-            id: superadmin.id,
+            id: String(superadmin.id),
             name: superadmin.name,
             email: superadmin.email,
             role: "superadmin",
@@ -89,7 +96,7 @@ export const authOptions: AuthOptions = {
           bcrypt.compareSync(credentials.password, user.password_hash)
         ) {
           return {
-            id: user.id,
+            id: String(user.id),
             name: user.name,
             email: user.email,
             role: "admin",
@@ -110,7 +117,7 @@ export const authOptions: AuthOptions = {
   callbacks: {
     async session({ session, token }: { session: Session; token: JWT }) {
       if (token) {
-        session.user.id = token.id as number;
+        session.user.id = String(token.id);
         session.user.role = token.role as string;
         if (token.profile_pic)
           session.user.profile_pic = token.profile_pic as string;
@@ -119,18 +126,7 @@ export const authOptions: AuthOptions = {
       }
       return session;
     },
-    async jwt({
-      token,
-      user,
-    }: {
-      token: JWT;
-      user?: {
-        id: number;
-        role: string;
-        profile_pic?: string;
-        department?: string;
-      };
-    }) {
+    async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
         token.role = user.role;
