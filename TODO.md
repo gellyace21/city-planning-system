@@ -25,7 +25,13 @@
 - [x] Start neon database
   - [x] Import database tables/fields (Neon PgSQL)
   - [x] Create CDN or a host for the profile pictures (Cloudflare R2 - 10gb Storage)
-  - [ ] Connect Neon and R2 to system
+    <!-- Getting an ORM (Prisma) is not needed for a small project -->
+    <!-- ORMs help shorten queries (SELECT id, name, etc WHERE id = 0; users.GetbyId(20)) -->
+    ~~- [ ] Get Prisma~~
+    <!-- lib/db.ts, lib/types.ts - Connection, Type safety of tables -->
+  - [x] Connect Neon
+  - [ ] Convert API routes to Neon
+  - [ ] Connect R2 to system
 - [ ] Host online
 
 # Current Features
