@@ -13,7 +13,7 @@ export default function ProfileModal({
   onClose,
   adminId,
 }: ProfileModalProps): React.JSX.Element | null {
-  const { data: session } = useSession();
+  const { data: session, update } = useSession();
   const isLead = session?.user?.role === "lead";
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -82,6 +82,10 @@ export default function ProfileModal({
           const data = (await response.json()) as { url?: string };
           if (data.url) {
             setProfilePhoto(data.url);
+
+            await update({
+              profile_pic: data.url,
+            });
 
             if (currentAdminId) {
               const profileResponse = await fetch(
@@ -174,6 +178,11 @@ export default function ProfileModal({
 
       const data = await response.json();
       console.log("Profile updated:", data);
+      await update({
+        name: fullName,
+        email,
+        profile_pic: profilePhoto,
+      });
       setCurrentPassword("");
       setPassword("");
       setConfirmPassword("");

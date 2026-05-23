@@ -24,18 +24,17 @@
 
 - [x] Start neon database
   - [x] Import database tables/fields (Neon PgSQL)
-  - [x] Create CDN or a host for the profile pictures (Cloudflare R2 - 10gb Storage)
+  - [x] Create CDN or a host for the profile pictures (Vercel Blob)
     <!-- Getting an ORM (Prisma) is not needed for a small project -->
     <!-- ORMs help shorten queries (SELECT id, name, etc WHERE id = 0; users.GetbyId(20)) -->
     ~~- [ ] Get Prisma~~
     <!-- lib/db.ts, lib/types.ts - Connection, Type safety of tables -->
   - [x] Connect Neon
-    <!-- lib/r2.ts - establish connection to R2, create image upload function -->
-    <!-- needed: npm install @aws-sdk/client-s3 -->
-  - [x] Connect R2 to system
+  <!-- lib/r2.ts was replaced by the Vercel Blob upload route -->
+  - [x] Connect Blob to system
   - [x] Host online (https://city-planning-system.vercel.app/login)
   <!-- Connection established, functions remaining -->
-  - [ ] Convert API routes to Neon/R2
+  - [ ] Convert API routes to Neon/Blob
 
 # Current Features
 

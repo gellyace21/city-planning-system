@@ -27,6 +27,9 @@ declare module "next-auth" {
 
 const fallbackDevSecret = "city-planning-dev-secret-change-me";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export const authOptions: AuthOptions = {
   secret: process.env.NEXTAUTH_SECRET || fallbackDevSecret,
   providers: [
@@ -136,13 +139,29 @@ export const authOptions: AuthOptions = {
       }
       return session;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.role = user.role;
         if (user.profile_pic) token.profile_pic = user.profile_pic;
         if (user.department) token.department = user.department;
       }
+
+      if (trigger === "update" && session) {
+        if (typeof session.profile_pic === "string") {
+          token.profile_pic = session.profile_pic;
+        }
+        if (typeof session.department === "string") {
+          token.department = session.department;
+        }
+        if (typeof session.name === "string") {
+          token.name = session.name;
+        }
+        if (typeof session.email === "string") {
+          token.email = session.email;
+        }
+      }
+
       return token;
     },
   },

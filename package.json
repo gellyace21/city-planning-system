@@ -9,10 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1053.0",
     "@neondatabase/serverless": "^1.1.0",
     "@tabler/icons-preact": "^3.41.1",
     "@tabler/icons-react": "^3.41.1",
+    "@vercel/blob": "^2.4.0",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

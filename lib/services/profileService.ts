@@ -141,15 +141,34 @@ export async function updateAdminProfile(
     ...updates,
   };
 
+  // If the update only contains profile_pic, update that column only
+  const updateKeys = Object.keys(updates);
+  if (updateKeys.length === 1 && updateKeys[0] === "profile_pic") {
+    await sql`
+      UPDATE admins
+      SET profile_pic = ${next.profile_pic ?? null}
+      WHERE id = ${adminId}
+    `;
+    return next;
+  }
+
+  // For other partial updates, use COALESCE to preserve existing values when
+  // the incoming value is undefined/null. For boolean fields, pass null when
+  // undefined so COALESCE will keep the current value.
+  const isActiveParam =
+    typeof next.is_active === "boolean" ? next.is_active : null;
+  const isSuperParam =
+    typeof next.is_superadmin === "boolean" ? next.is_superadmin : null;
+
   await sql`
     UPDATE admins
     SET
-      name = ${next.name},
-      email = ${next.email},
-      phone = ${next.phone ?? null},
-      profile_pic = ${next.profile_pic ?? null},
-      is_active = ${Boolean(next.is_active)},
-      is_superadmin = ${Boolean(next.is_superadmin)}
+      name = COALESCE(${next.name}, name),
+      email = COALESCE(${next.email}, email),
+      phone = COALESCE(${next.phone ?? null}, phone),
+      profile_pic = COALESCE(${next.profile_pic ?? null}, profile_pic),
+      is_active = COALESCE(${isActiveParam}, is_active),
+      is_superadmin = COALESCE(${isSuperParam}, is_superadmin)
     WHERE id = ${adminId}
   `;
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { updateUserProfileByRole } from "@/lib/services/profileService";
-import { uploadFile } from "@/lib/r2";
+import { put } from "@vercel/blob";
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,7 +27,10 @@ export async function POST(request: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const key = `avatars/${session.user.role}-${session.user.id}-${Date.now()}-${file.name}`;
-    const url = await uploadFile(key, buffer, file.type);
+    const blob = await put(key, buffer, {
+      access: "public",
+      contentType: file.type,
+    });
 
     const userId = Number(session.user.id);
     if (!Number.isFinite(userId) || userId <= 0) {
@@ -35,9 +38,9 @@ export async function POST(request: NextRequest) {
     }
 
     const role = String(session.user.role);
-    await updateUserProfileByRole(userId, role, { profile_pic: url });
+    await updateUserProfileByRole(userId, role, { profile_pic: blob.url });
 
-    return NextResponse.json({ url });
+    return NextResponse.json({ url: blob.url });
   } catch (error) {
     console.error("Failed to upload profile photo:", error);
     return NextResponse.json(
