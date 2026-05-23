@@ -30,9 +30,12 @@
     ~~- [ ] Get Prisma~~
     <!-- lib/db.ts, lib/types.ts - Connection, Type safety of tables -->
   - [x] Connect Neon
-  - [ ] Convert API routes to Neon
-  - [ ] Connect R2 to system
-- [ ] Host online
+    <!-- lib/r2.ts - establish connection to R2, create image upload function -->
+    <!-- needed: npm install @aws-sdk/client-s3 -->
+  - [x] Connect R2 to system
+  - [x] Host online (https://city-planning-system.vercel.app/login)
+  <!-- Connection established, functions remaining -->
+  - [ ] Convert API routes to Neon/R2
 
 # Current Features
 
