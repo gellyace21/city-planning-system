@@ -1575,7 +1575,7 @@ export default function ProjectTable({
               {mode === "aip" ? "Annual Investment Plan" : "Project Monitoring"}
             </h1>
             <p className="text-sm text-gray-500">
-              Data source: db.json via services
+              Data source: Neon via services
             </p>
           </div>
           <div className="flex items-center gap-2">

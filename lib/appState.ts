@@ -1,7 +1,5 @@
 import "server-only";
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { sql } from "@/lib/db";
 
 export type AppState = {
@@ -21,19 +19,9 @@ export type AppState = {
   [key: string]: unknown;
 };
 
-const DB_PATH = path.join(process.cwd(), "db.json");
 const STATE_ID = 1;
 
 let initPromise: Promise<void> | null = null;
-
-async function readSeedState(): Promise<AppState> {
-  try {
-    const raw = await fs.readFile(DB_PATH, "utf-8");
-    return JSON.parse(raw) as AppState;
-  } catch {
-    return {};
-  }
-}
 
 async function ensureState(): Promise<void> {
   if (initPromise) {
@@ -55,10 +43,9 @@ async function ensureState(): Promise<void> {
     `) as Array<{ data: AppState }>;
 
     if (rows.length === 0) {
-      const seed = await readSeedState();
       await sql`
         INSERT INTO app_state (id, data)
-        VALUES (${STATE_ID}, ${JSON.stringify(seed)}::jsonb)
+        VALUES (${STATE_ID}, '{}'::jsonb)
       `;
     }
   })().catch((error) => {
