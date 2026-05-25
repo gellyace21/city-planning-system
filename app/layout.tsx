@@ -14,6 +14,8 @@ import Nav from "../components/layout/navbar";
 import { cn } from "@/lib/utils";
 import { AuthProvider } from "./providers";
 
+// Fonts
+
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -49,10 +51,16 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Metadata
+
 export const metadata: Metadata = {
-  title: "City Planning Developmet Office",
-  description: "Created by OJT Students",
+  title: {
+    default: "City Planning",
+    template: " %s | City Planning",
+  },
 };
+
+// Output
 
 export default function RootLayout({
   children,

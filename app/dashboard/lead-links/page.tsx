@@ -1,5 +1,9 @@
 import LeadLinksManager from "@/components/LeadLinksManager";
 
+export const metadata = {
+  title: "Lead Access Links",
+};
+
 export default function LeadLinksPage() {
   return (
     <div className="w-full max-w-6xl px-4 py-6">

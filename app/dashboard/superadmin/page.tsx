@@ -4,6 +4,10 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
 import SuperadminAdminManager from "@/components/SuperadminAdminManager";
 
+export const metadata = {
+  title: "Superadmin Dashboard",
+};
+
 const page = async () => {
   const session = await getServerSession(authOptions);
   if (session?.user?.role !== "superadmin") {

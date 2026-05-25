@@ -1,3 +1,7 @@
+export const metadata = {
+  title: "Profile",
+};
+
 export default function ProfilePage(): React.JSX.Element {
   return (
     <main className="mx-auto max-w-5xl p-6">
