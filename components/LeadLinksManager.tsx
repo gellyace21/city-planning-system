@@ -46,6 +46,7 @@ export default function LeadLinksManager({
   >({});
   const [expandedLeadId, setExpandedLeadId] = useState<number | null>(null);
   const [linkLoading, setLinkLoading] = useState(false);
+  const [generatingLeadId, setGeneratingLeadId] = useState<number | null>(null);
   const [linkMessage, setLinkMessage] = useState("");
   const [linkError, setLinkError] = useState("");
   const [pendingDelete, setPendingDelete] = useState<GeneratedLink | null>(
@@ -113,7 +114,32 @@ export default function LeadLinksManager({
             : data?.error || "Failed to load lead links",
         );
       }
-      setGeneratedLinks(data.links || []);
+      // Merge any leads that don't yet have a generated link so admins can see them
+      const apiLinks: GeneratedLink[] = data.links || [];
+      const apiLeads: Array<{
+        id: number;
+        username?: string | null;
+        department?: string | null;
+      }> = data.leads || [];
+
+      const existingLeadIds = new Set(
+        apiLinks.map((l: any) => Number(l.lead_id)),
+      );
+      const placeholderLinks: GeneratedLink[] = apiLeads
+        .filter((lead) => !existingLeadIds.has(Number(lead.id)))
+        .map((lead) => ({
+          id: 0,
+          lead_id: Number(lead.id),
+          lead_username: lead.username || `Lead ${lead.id}`,
+          lead_profile_pic: undefined,
+          token: "",
+          created_at: "",
+          last_accessed_at: undefined,
+          lead_department: lead.department || "General",
+          url: "",
+        }));
+
+      setGeneratedLinks([...apiLinks, ...placeholderLinks]);
       const grouped = ((data.leadFiles || []) as LeadUploadedFile[]).reduce(
         (acc, file) => {
           if (!acc[file.lead_id]) {
@@ -178,6 +204,40 @@ export default function LeadLinksManager({
       );
     } finally {
       setLinkLoading(false);
+    }
+  };
+
+  const handleGenerateForLead = async (leadId: number) => {
+    setGeneratingLeadId(leadId);
+    setLinkError("");
+    setLinkMessage("");
+
+    try {
+      const response = await fetch("/api/lead-links", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ leadId }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to generate lead link");
+      }
+
+      setLinkValue(data.link?.url || "");
+      setLinkMessage(
+        data.link?.reused
+          ? "Existing link reused for this lead."
+          : "New secure link generated.",
+      );
+      await fetchLinks();
+    } catch (error) {
+      setLinkError(
+        error instanceof Error ? error.message : "Failed to generate link",
+      );
+    } finally {
+      setGeneratingLeadId(null);
     }
   };
 
@@ -929,13 +989,28 @@ export default function LeadLinksManager({
                                   ? "Hide Uploaded Files"
                                   : "View Uploaded Files"}
                               </button>
-                              <button
-                                type="button"
-                                className="copy-btn"
-                                onClick={() => handleCopyLink(entry.url)}
-                              >
-                                Copy Link
-                              </button>
+                              {entry.url ? (
+                                <button
+                                  type="button"
+                                  className="copy-btn"
+                                  onClick={() => handleCopyLink(entry.url)}
+                                >
+                                  Copy Link
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="generate-btn"
+                                  onClick={() =>
+                                    handleGenerateForLead(entry.lead_id)
+                                  }
+                                  disabled={generatingLeadId === entry.lead_id}
+                                >
+                                  {generatingLeadId === entry.lead_id
+                                    ? "Generating..."
+                                    : "Generate link"}
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 className="delete-btn"
@@ -1044,13 +1119,26 @@ export default function LeadLinksManager({
                           ? "Hide Uploaded Files"
                           : "View Uploaded Files"}
                       </button>
-                      <button
-                        type="button"
-                        className="copy-btn"
-                        onClick={() => handleCopyLink(entry.url)}
-                      >
-                        Copy Link
-                      </button>
+                      {entry.url ? (
+                        <button
+                          type="button"
+                          className="copy-btn"
+                          onClick={() => handleCopyLink(entry.url)}
+                        >
+                          Copy Link
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="generate-btn"
+                          onClick={() => handleGenerateForLead(entry.lead_id)}
+                          disabled={generatingLeadId === entry.lead_id}
+                        >
+                          {generatingLeadId === entry.lead_id
+                            ? "Generating..."
+                            : "Generate link"}
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="delete-btn"

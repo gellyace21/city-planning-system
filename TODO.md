@@ -1,3 +1,5 @@
+<!-- Preview with Ctrl+Shift+V -->
+
 # Missing Features
 
 - project monitoring export is still not the same design projmonit.xlsx, it is actually corrupted at the moment. Please refer to how AIP did its export but use projmonit.xlsx as the excel sheet format. thank you. The idea is, you first convert proj monit2.xlsx then find the cells you can put the monitoring data in then put it there then parse it again to xlsx from base64 to retain the design but the data changed.
@@ -18,12 +20,18 @@
 - [x] Fix monitoring export (Possible causes below)
   - Monitoring and AIP are different formats
   - **Solution:**
+- [x] ProjTables - change submitted, draft to complete, incomplete
 - [ ] add super admin login bg gradient
 - [ ] Add lead links manager icons to buttons
 - [ ] Add loading states
-- [ ] ProjTables - change submitted, draft to complete, incomplete
+- [ ] Fix print to output the XLSX; not the website view
 
 ## External
+
+- [ ] _To solve lead upload **submit problem**:_ Identify which AIP fields need to be filled out by Implementation Lead
+  - Alternatively, what fields do Admins need to fill out?
+
+### Done (May 25, 2026)
 
 - [x] Start neon database
   - [x] Import database tables/fields (Neon PgSQL)

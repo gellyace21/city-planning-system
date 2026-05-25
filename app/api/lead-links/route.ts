@@ -45,6 +45,7 @@ function makeToken() {
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
+    console.log("/api/lead-links GET session:", session?.user);
     if (
       !session?.user?.id ||
       !["admin", "superadmin"].includes(session.user.role)
@@ -81,6 +82,17 @@ export async function GET(request: NextRequest) {
       ORDER BY lf.uploaded_at DESC
     `) as Array<LeadFile>;
 
+    const allLeads = (await sql`
+      SELECT id, COALESCE(username, '') as username, COALESCE(department, '') as department, created_at
+      FROM leads
+      ORDER BY created_at DESC
+    `) as Array<{
+      id: number;
+      username: string | null;
+      department: string | null;
+      created_at: string;
+    }>;
+
     const origin = request.nextUrl.origin;
 
     const result = links.map((link) => {
@@ -101,7 +113,11 @@ export async function GET(request: NextRequest) {
       is_submitted: true,
     }));
 
-    return NextResponse.json({ links: result, leadFiles: files });
+    return NextResponse.json({
+      links: result,
+      leadFiles: files,
+      leads: allLeads,
+    });
   } catch (error) {
     console.error("Failed to get lead links:", error);
     return NextResponse.json(
@@ -114,6 +130,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
+    console.log("/api/lead-links POST session:", session?.user);
     if (
       !session?.user?.id ||
       !["admin", "superadmin"].includes(session.user.role)
@@ -122,26 +139,42 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const leadUsername = String(body?.leadUsername || "").trim();
-    const hasLeadUsername = Boolean(leadUsername);
+    console.log("/api/lead-links POST body:", body);
 
-    const leadRows = hasLeadUsername
-      ? ((await sql`
-          SELECT id, username, department, token
-          FROM leads
-          WHERE LOWER(username) = LOWER(${leadUsername})
-          LIMIT 1
-        `) as Array<LeadRecord>)
-      : [];
-    let lead = leadRows[0] || null;
+    // Support creating a generated link for an existing lead by id.
+    const leadIdFromBody = Number(body?.leadId);
+    let lead: LeadRecord | null = null;
 
-    if (!lead) {
-      const [createdLead] = (await sql`
-        INSERT INTO leads (token, username, password_hash, department, is_active)
-        VALUES (${makeToken()}, ${leadUsername || null}, '', '', true)
-        RETURNING id, username, department, token
+    if (Number.isFinite(leadIdFromBody) && leadIdFromBody > 0) {
+      const rows = (await sql`
+        SELECT id, username, department, token
+        FROM leads
+        WHERE id = ${leadIdFromBody}
+        LIMIT 1
       `) as Array<LeadRecord>;
-      lead = createdLead;
+      lead = rows[0] || null;
+    } else {
+      const leadUsername = String(body?.leadUsername || "").trim();
+      const hasLeadUsername = Boolean(leadUsername);
+
+      const leadRows = hasLeadUsername
+        ? ((await sql`
+            SELECT id, username, department, token
+            FROM leads
+            WHERE LOWER(username) = LOWER(${leadUsername})
+            LIMIT 1
+          `) as Array<LeadRecord>)
+        : [];
+      lead = leadRows[0] || null;
+
+      if (!lead) {
+        const [createdLead] = (await sql`
+          INSERT INTO leads (token, username, password_hash, department, is_active)
+          VALUES (${makeToken()}, ${leadUsername || null}, '', '', true)
+          RETURNING id, username, department, token
+        `) as Array<LeadRecord>;
+        lead = createdLead;
+      }
     }
 
     const existingLinks = (await sql`
@@ -192,6 +225,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
+    console.log("/api/lead-links DELETE session:", session?.user);
     if (
       !session?.user?.id ||
       !["admin", "superadmin"].includes(session.user.role)
