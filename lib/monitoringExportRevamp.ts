@@ -200,17 +200,7 @@ const downloadBlob = (blob: Blob, filename: string): void => {
   URL.revokeObjectURL(url);
 };
 
-const loadMonitoringTemplate = async (): Promise<ArrayBuffer> => {
-  try {
-    const response = await fetch("/templates/projmonit2.xlsx", {
-      cache: "no-cache",
-    });
-    if (response.ok) {
-      return await response.arrayBuffer();
-    }
-  } catch {
-    // Fall back to embedded base64 when fetch fails.
-  }
+const loadMonitoringTemplate = (): ArrayBuffer => {
   return toArrayBufferFromBase64(MONITORING_TEMPLATE_BASE64);
 };
 

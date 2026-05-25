@@ -15,10 +15,13 @@
 
 ## System
 
-- [ ] Fix monitoring export
+- [x] Fix monitoring export (Possible causes below)
+  - Monitoring and AIP are different formats
+  - **Solution:**
 - [ ] add super admin login bg gradient
 - [ ] Add lead links manager icons to buttons
 - [ ] Add loading states
+- [ ] ProjTables - change submitted, draft to complete, incomplete
 
 ## External
 
@@ -34,7 +37,7 @@
   - [x] Connect Blob to system
   - [x] Host online (https://city-planning-system.vercel.app/login)
   <!-- Connection established, functions remaining -->
-  - [ ] Convert API routes to Neon/Blob
+  - [x] Convert API routes to Neon/Blob
 
 # Current Features
 

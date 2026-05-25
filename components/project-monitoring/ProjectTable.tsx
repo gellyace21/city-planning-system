@@ -49,7 +49,7 @@ import {
   IconUsers,
 } from "@tabler/icons-react";
 import { downloadAIP, parseAIPExcel } from "@/lib/aipExport";
-import { downloadMonitoring } from "@/lib/monitoringExportRevamp";
+import { downloadMonitoring } from "@/lib/monitoringExport2";
 import { useSession } from "next-auth/react";
 
 type ActiveDataset = "aip" | "monitoring";
@@ -1542,15 +1542,11 @@ export default function ProjectTable({
   };
 
   const exportMonitoring = (): void => {
-    const debugValidate =
-      typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).get("debugExport") === "1";
     downloadMonitoring(
       filteredMonitoring,
       `monitoring_${monitoringYear === "All" ? "all-years" : monitoringYear}.xlsx`,
       {
         fallbackToCsv: true,
-        debugValidate,
       },
     );
   };
