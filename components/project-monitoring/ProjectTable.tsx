@@ -1515,7 +1515,11 @@ export default function ProjectTable({
   };
 
   const handlePrint = (): void => {
-    window.print();
+    if (mode === "aip") {
+      exportAip();
+      return;
+    }
+    exportMonitoring();
   };
 
   const exportAip = (): void => {
@@ -1599,7 +1603,7 @@ export default function ProjectTable({
               onClick={handlePrint}
               className="px-3 py-1.5 rounded-lg text-sm font-semibold border bg-white text-gray-700 border-gray-200 flex items-center gap-1"
             >
-              <IconPrinter size={16} /> Print
+              <IconPrinter size={16} /> Export XLSX
             </button>
             {(isAdmin || isSuperadmin) && (
               <>
