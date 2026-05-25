@@ -345,7 +345,7 @@ export default function AIPTable({
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={commitEdit}
             onKeyDown={handleKeyDown}
-            className="w-full min-w-0 text-[12px] border border-sky-400 rounded px-1 py-0.5 bg-sky-50 focus:outline-none focus:ring-1 focus:ring-sky-500"
+            className="w-full min-w-0 text-[14px] border border-sky-400 rounded px-1 py-0.5 bg-sky-50 focus:outline-none focus:ring-1 focus:ring-sky-500"
           />
           {commentCount > 0 && (
             <button
@@ -383,7 +383,7 @@ export default function AIPTable({
           {numeric
             ? fmt(value as number)
             : (value as string) || (
-                <span className="text-gray-300 italic text-xs">—</span>
+                <span className="text-gray-300 italic text-[13px]">—</span>
               )}
           {status && (
             <span
@@ -467,7 +467,7 @@ export default function AIPTable({
         ref={scrollRef}
         className="table-container-aip max-h-[60vh] overflow-auto"
       >
-        <table className="min-w-full w-max table-fixed text-[12px] border-collapse [&_th]:align-top [&_td]:align-top [&_td]:wrap-break-word [&_td]:whitespace-normal">
+        <table className="min-w-full w-max table-fixed text-[15px] border-collapse [&_th]:align-top [&_td]:align-top [&_td]:wrap-break-word [&_td]:whitespace-normal">
           <colgroup>
             {columnWidths.map((width, index) => (
               <col key={`aip-col-${index}`} style={{ width: `${width}px` }} />
@@ -635,7 +635,7 @@ export default function AIPTable({
                   <EditableCell
                     row={row}
                     field="aipCode"
-                    className="px-1 py-1 font-mono text-[10px] font-bold text-sky-700"
+                    className="px-1 py-1 font-mono text-[13px] font-bold text-sky-700"
                   />
                   <EditableCell
                     row={row}
@@ -659,7 +659,7 @@ export default function AIPTable({
                         onChange={(e) => setEditValue(e.target.value)}
                         onBlur={commitEdit}
                         onKeyDown={handleKeyDown}
-                        className="w-full text-xs border border-sky-400 rounded px-1 py-0.5 bg-sky-50 focus:outline-none"
+                        className="w-full text-[14px] border border-sky-400 rounded px-1 py-0.5 bg-sky-50 focus:outline-none"
                       />
                     ) : (
                       <SectorBadge sector={row.sector} />
@@ -683,12 +683,12 @@ export default function AIPTable({
                   <EditableCell
                     row={row}
                     field="department"
-                    className="px-1.5 py-1.5 text-gray-600 text-[12px]"
+                    className="px-1.5 py-1.5 text-gray-600 text-[15px]"
                   />
 
                   {/* Schedule */}
                   <td
-                    className={`px-1.5 py-1.5 text-[12px] text-gray-500 relative ${scheduleCommentClass}`}
+                    className={`px-1.5 py-1.5 text-[15px] text-gray-500 relative ${scheduleCommentClass}`}
                   >
                     <div className="flex flex-col gap-0.5">
                       {editCell?.rowId === row.id &&
@@ -700,7 +700,7 @@ export default function AIPTable({
                           onChange={(e) => setEditValue(e.target.value)}
                           onBlur={commitEdit}
                           onKeyDown={handleKeyDown}
-                          className="w-20 text-xs border border-sky-400 rounded px-1 py-0.5 bg-sky-50 focus:outline-none"
+                          className="w-20 text-[14px] border border-sky-400 rounded px-1 py-0.5 bg-sky-50 focus:outline-none"
                         />
                       ) : (
                         <span
@@ -738,7 +738,7 @@ export default function AIPTable({
                           onChange={(e) => setEditValue(e.target.value)}
                           onBlur={commitEdit}
                           onKeyDown={handleKeyDown}
-                          className="w-20 text-xs border border-sky-400 rounded px-1 py-0.5 bg-sky-50 focus:outline-none"
+                          className="w-20 text-[14px] border border-sky-400 rounded px-1 py-0.5 bg-sky-50 focus:outline-none"
                         />
                       ) : (
                         <span
@@ -774,12 +774,12 @@ export default function AIPTable({
                   <EditableCell
                     row={row}
                     field="outputs"
-                    className="px-1.5 py-1.5 text-[12px] text-gray-600"
+                    className="px-1.5 py-1.5 text-[15px] text-gray-600"
                   />
 
                   {/* Funding */}
                   <td
-                    className={`px-1.5 py-1.5 text-[12px] relative ${fundingCommentClass}`}
+                    className={`px-1.5 py-1.5 text-[15px] relative ${fundingCommentClass}`}
                     onDoubleClick={() =>
                       startEdit(row.id, "funding", row.funding)
                     }
@@ -794,7 +794,7 @@ export default function AIPTable({
                         onChange={(e) => setEditValue(e.target.value)}
                         onBlur={commitEdit}
                         onKeyDown={handleKeyDown}
-                        className="w-full text-xs border border-sky-400 rounded px-1.5 py-0.5 bg-sky-50 focus:outline-none"
+                        className="w-full text-[14px] border border-sky-400 rounded px-1.5 py-0.5 bg-sky-50 focus:outline-none"
                       />
                     ) : (
                       <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-600 font-medium cursor-pointer hover:bg-sky-50 transition-colors">
@@ -825,7 +825,7 @@ export default function AIPTable({
                       key={k as string}
                       row={row}
                       field={k}
-                      className="px-1.5 py-1.5 text-right text-[12px] text-gray-600 border-l border-sky-50 tabular-nums"
+                      className="px-1.5 py-1.5 text-right text-[15px] text-gray-600 border-l border-sky-50 tabular-nums"
                       numeric
                     />
                   ))}
@@ -835,26 +835,26 @@ export default function AIPTable({
                     row={row}
                     field="total"
                     readOnly
-                    className="px-1.5 py-1.5 text-right text-[12px] border-l border-sky-100 tabular-nums bg-sky-50/40"
+                    className="px-1.5 py-1.5 text-right text-[15px] border-l border-sky-100 tabular-nums bg-sky-50/40"
                   />
 
                   {/* CC fields */}
                   <EditableCell
                     row={row}
                     field="ccAdaptation"
-                    className="px-1.5 py-1.5 text-right text-[12px] text-emerald-700 border-l border-emerald-100 tabular-nums"
+                    className="px-1.5 py-1.5 text-right text-[15px] text-emerald-700 border-l border-emerald-100 tabular-nums"
                     numeric
                   />
                   <EditableCell
                     row={row}
                     field="ccMitigation"
-                    className="px-1.5 py-1.5 text-right text-[12px] text-emerald-700 tabular-nums"
+                    className="px-1.5 py-1.5 text-right text-[15px] text-emerald-700 tabular-nums"
                     numeric
                   />
                   <EditableCell
                     row={row}
                     field="ccCode"
-                    className="px-1.5 py-1.5 text-center text-[12px]"
+                    className="px-1.5 py-1.5 text-center text-[15px]"
                   />
                   <td className="relative w-0 overflow-visible group border-0 bg-transparent px-0 py-1.5">
                     <button
@@ -884,49 +884,49 @@ export default function AIPTable({
                   <input type="checkbox" className="rounded" disabled />
                 </td>
                 <td
-                  className="px-1 py-1.5 text-[11px] italic cursor-pointer"
+                  className="px-1 py-1.5 text-[14px] italic cursor-pointer"
                   onDoubleClick={() => handleEmptyCellEdit("aipCode")}
                   title="Double-click to add row"
                 >
                   —
                 </td>
                 <td
-                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  className="px-1.5 py-1.5 text-[14px] italic cursor-pointer"
                   onDoubleClick={() => handleEmptyCellEdit("description")}
                   title="Double-click to add row"
                 >
                   —
                 </td>
                 <td
-                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  className="px-1.5 py-1.5 text-[14px] italic cursor-pointer"
                   onDoubleClick={() => handleEmptyCellEdit("sector")}
                   title="Double-click to add row"
                 >
                   —
                 </td>
                 <td
-                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  className="px-1.5 py-1.5 text-[14px] italic cursor-pointer"
                   onDoubleClick={() => handleEmptyCellEdit("department")}
                   title="Double-click to add row"
                 >
                   —
                 </td>
                 <td
-                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  className="px-1.5 py-1.5 text-[14px] italic cursor-pointer"
                   onDoubleClick={() => handleEmptyCellEdit("startDate")}
                   title="Double-click to add row"
                 >
                   start → end
                 </td>
                 <td
-                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  className="px-1.5 py-1.5 text-[14px] italic cursor-pointer"
                   onDoubleClick={() => handleEmptyCellEdit("outputs")}
                   title="Double-click to add row"
                 >
                   —
                 </td>
                 <td
-                  className="px-1.5 py-1.5 text-[11px] italic cursor-pointer"
+                  className="px-1.5 py-1.5 text-[14px] italic cursor-pointer"
                   onDoubleClick={() => handleEmptyCellEdit("funding")}
                   title="Double-click to add row"
                 >
@@ -936,7 +936,7 @@ export default function AIPTable({
                   (field) => (
                     <td
                       key={field as string}
-                      className="px-1.5 py-1.5 text-[11px] italic text-right cursor-pointer"
+                      className="px-1.5 py-1.5 text-[14px] italic text-right cursor-pointer"
                       onDoubleClick={() => handleEmptyCellEdit(field)}
                       title="Double-click to add row"
                     >
@@ -944,25 +944,25 @@ export default function AIPTable({
                     </td>
                   ),
                 )}
-                <td className="px-1.5 py-1.5 text-[11px] italic text-right">
+                <td className="px-1.5 py-1.5 text-[14px] italic text-right">
                   —
                 </td>
                 <td
-                  className="px-1.5 py-1.5 text-[11px] italic text-right cursor-pointer"
+                  className="px-1.5 py-1.5 text-[14px] italic text-right cursor-pointer"
                   onDoubleClick={() => handleEmptyCellEdit("ccAdaptation")}
                   title="Double-click to add row"
                 >
                   —
                 </td>
                 <td
-                  className="px-1.5 py-1.5 text-[11px] italic text-right cursor-pointer"
+                  className="px-1.5 py-1.5 text-[14px] italic text-right cursor-pointer"
                   onDoubleClick={() => handleEmptyCellEdit("ccMitigation")}
                   title="Double-click to add row"
                 >
                   —
                 </td>
                 <td
-                  className="px-1.5 py-1.5 text-[11px] italic text-center cursor-pointer"
+                  className="px-1.5 py-1.5 text-[14px] italic text-center cursor-pointer"
                   onDoubleClick={() => handleEmptyCellEdit("ccCode")}
                   title="Double-click to add row"
                 >

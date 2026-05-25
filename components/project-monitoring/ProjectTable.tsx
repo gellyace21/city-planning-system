@@ -998,7 +998,7 @@ export default function ProjectTable({
   const commitAipEdit = async (): Promise<void> => {
     if (!aipEditCell) return;
     if (isLead && isLeadRowLocked(aipEditCell.rowId)) {
-      setErrorMsg("This file is submitted and locked.");
+      setErrorMsg("This file is complete and locked.");
       setAipEditCell(null);
       setAipEditValue("");
       return;
@@ -1132,7 +1132,7 @@ export default function ProjectTable({
     currentVal: string | number,
   ): void => {
     if (isLead && isLeadRowLocked(rowId)) {
-      setErrorMsg("This file is submitted and locked.");
+      setErrorMsg("This file is complete and locked.");
       return;
     }
     setErrorMsg("");
@@ -1780,8 +1780,8 @@ export default function ProjectTable({
                           : ""}
                         {selectedUpload.is_submitted ||
                         selectedUpload.submitted_at
-                          ? " · Submitted"
-                          : " · Draft"}
+                          ? " · Complete"
+                          : " · Incomplete"}
                         <button
                           type="button"
                           className="text-[10px] font-semibold text-sky-700 underline"
@@ -1907,8 +1907,8 @@ export default function ProjectTable({
                                 }`}
                               >
                                 {file.is_submitted || file.submitted_at
-                                  ? "Submitted"
-                                  : "Draft"}
+                                  ? "Complete"
+                                  : "Incomplete"}
                               </span>
                             </div>
                           </div>
@@ -1969,8 +1969,8 @@ export default function ProjectTable({
                 {(
                   [
                     ["all", `All (${visibleAipRows.length})`],
-                    ["submitted", `Submitted (${aipStatusCounts.submitted})`],
-                    ["draft", `Draft (${aipStatusCounts.draft})`],
+                    ["submitted", `Complete (${aipStatusCounts.submitted})`],
+                    ["draft", `Incomplete (${aipStatusCounts.draft})`],
                   ] as const
                 ).map(([tab, label]) => (
                   <button
@@ -2082,9 +2082,9 @@ export default function ProjectTable({
                     ["all", `All (${monitoringRows.length})`],
                     [
                       "submitted",
-                      `Submitted (${monitoringStatusCounts.submitted})`,
+                      `Complete (${monitoringStatusCounts.submitted})`,
                     ],
-                    ["draft", `Draft (${monitoringStatusCounts.draft})`],
+                    ["draft", `Incomplete (${monitoringStatusCounts.draft})`],
                   ] as const
                 ).map(([tab, label]) => (
                   <button
