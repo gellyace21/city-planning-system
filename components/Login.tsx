@@ -2,6 +2,7 @@
 import { getSession, signIn, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { IconLoader2 } from "@tabler/icons-react";
 
 export default function Login(): React.JSX.Element {
   const router = useRouter();
@@ -82,8 +83,14 @@ export default function Login(): React.JSX.Element {
                 required
               />
             </div>
-            <button className="btn-login" type="submit">
-              Login
+            <button className="btn-login" type="submit" disabled={loading}>
+              {loading ? (
+                <span className="btn-label">
+                  <IconLoader2 size={14} className="spin" /> Signing in...
+                </span>
+              ) : (
+                "Login"
+              )}
             </button>
           </form>
           {error !== "" ? <p className="text-red-400">{error}</p> : null}
@@ -236,6 +243,10 @@ export default function Login(): React.JSX.Element {
         }
 
         .btn-login {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
           width: 70%;
           padding: 11px;
           margin-top: 6px;
@@ -249,6 +260,21 @@ export default function Login(): React.JSX.Element {
           letter-spacing: 1px;
           cursor: pointer;
           box-shadow: 0 4px 12px rgba(46, 125, 98, 0.3);
+        }
+
+        .btn-login:disabled {
+          opacity: 0.8;
+          cursor: not-allowed;
+        }
+
+        .btn-label {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .spin {
+          animation: spin 0.9s linear infinite;
         }
 
         .register-link {
@@ -332,6 +358,15 @@ export default function Login(): React.JSX.Element {
           }
           50% {
             transform: translateY(-10px);
+          }
+        }
+
+        @keyframes spin {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
           }
         }
 

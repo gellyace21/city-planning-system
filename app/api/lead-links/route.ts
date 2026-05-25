@@ -140,6 +140,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     console.log("/api/lead-links POST body:", body);
+    const department = String(body?.department || "").trim();
 
     // Support creating a generated link for an existing lead by id.
     const leadIdFromBody = Number(body?.leadId);
@@ -153,6 +154,16 @@ export async function POST(request: NextRequest) {
         LIMIT 1
       `) as Array<LeadRecord>;
       lead = rows[0] || null;
+
+      if (lead && department) {
+        const [updatedLead] = (await sql`
+          UPDATE leads
+          SET department = ${department}
+          WHERE id = ${lead.id}
+          RETURNING id, username, department, token
+        `) as Array<LeadRecord>;
+        lead = updatedLead || lead;
+      }
     } else {
       const leadUsername = String(body?.leadUsername || "").trim();
       const hasLeadUsername = Boolean(leadUsername);
@@ -170,10 +181,18 @@ export async function POST(request: NextRequest) {
       if (!lead) {
         const [createdLead] = (await sql`
           INSERT INTO leads (token, username, password_hash, department, is_active)
-          VALUES (${makeToken()}, ${leadUsername || null}, '', '', true)
+          VALUES (${makeToken()}, ${leadUsername || null}, '', ${department || null}, true)
           RETURNING id, username, department, token
         `) as Array<LeadRecord>;
         lead = createdLead;
+      } else if (department && !String(lead.department || "").trim()) {
+        const [updatedLead] = (await sql`
+          UPDATE leads
+          SET department = ${department}
+          WHERE id = ${lead.id}
+          RETURNING id, username, department, token
+        `) as Array<LeadRecord>;
+        lead = updatedLead || lead;
       }
     }
 

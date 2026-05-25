@@ -124,79 +124,81 @@ const Navbar = () => {
         {/* List Items */}
         {showNav ? (
           <div className="flex items-center gap-4 h-full">
-            <ul
-              className={`flex items-center h-8 mr-8 gap-4 [&>li>a]:tracking-widest [&>li]:pb-4 [&>li]:pt-1 [&>li]:px-4 [&>li]:text-(--foreground) [&>li]:hover:border-b-2 [&>li]:hover:border-b-(--primary) [&>li]:hover:text-(--primary) [&>li]:transition [&>li]:duration-100`}
-            >
-              {showNavItems && (
-                <>
-                  {!isLead ? (
+            {!isLead && (
+              <ul
+                className={`flex items-center h-8 mr-8 gap-4 [&>li>a]:tracking-widest [&>li]:pb-4 [&>li]:pt-1 [&>li]:px-4 [&>li]:text-(--foreground) [&>li]:hover:border-b-2 [&>li]:hover:border-b-(--primary) [&>li]:hover:text-(--primary) [&>li]:transition [&>li]:duration-100`}
+              >
+                {showNavItems && (
+                  <>
+                    {!isLead ? (
+                      <li
+                        className={`h-full group ${pathname === "/dashboard/project-monitoring" ? "border-b-2 border-b-(--primary) text-(--foreground)" : "text-(--foreground)"}`}
+                      >
+                        <Link
+                          href="/dashboard/project-monitoring"
+                          className="flex items-center justify-center gap-2"
+                        >
+                          <img
+                            src="/icons/chart.png"
+                            alt=""
+                            width={16}
+                            height={16}
+                            className="invert-0 dark:invert group-hover:filter-[brightness(0)_saturate(100%)_invert(47%)_sepia(71%)_saturate(499%)_hue-rotate(123deg)_brightness(87%)_contrast(97%)] dark:group-hover:filter-[brightness(0)_saturate(100%)_invert(47%)_sepia(71%)_saturate(499%)_hue-rotate(123deg)_brightness(87%)_contrast(97%)] transition duration-200"
+                          />
+                          Project Monitoring
+                        </Link>
+                      </li>
+                    ) : null}
                     <li
-                      className={`h-full group ${pathname === "/dashboard/project-monitoring" ? "border-b-2 border-b-(--primary) text-(--foreground)" : "text-(--foreground)"}`}
+                      className={`h-full group ${pathname === "/dashboard/annual-investment-plan" ? "border-b-2 border-b-(--primary) [&>span]:text-(--primary)" : "text-black"}`}
                     >
                       <Link
-                        href="/dashboard/project-monitoring"
+                        href="/dashboard/annual-investment-plan"
                         className="flex items-center justify-center gap-2"
                       >
-                        <img
-                          src="/icons/chart.png"
-                          alt=""
-                          width={16}
-                          height={16}
-                          className="invert-0 dark:invert group-hover:filter-[brightness(0)_saturate(100%)_invert(47%)_sepia(71%)_saturate(499%)_hue-rotate(123deg)_brightness(87%)_contrast(97%)] dark:group-hover:filter-[brightness(0)_saturate(100%)_invert(47%)_sepia(71%)_saturate(499%)_hue-rotate(123deg)_brightness(87%)_contrast(97%)] transition duration-200"
-                        />
-                        Project Monitoring
+                        {isLead ? (
+                          "Workspace"
+                        ) : (
+                          <>
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              width={16}
+                              className="stroke-(--foreground) group-hover:stroke-(--primary)"
+                            >
+                              <path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
+                              <path d="M22 12A10 10 0 0 0 12 2v10z"></path>
+                            </svg>
+                            <span>Annual Investment Plan</span>
+                          </>
+                        )}
                       </Link>
                     </li>
-                  ) : null}
-                  <li
-                    className={`h-full group ${pathname === "/dashboard/annual-investment-plan" ? "border-b-2 border-b-(--primary) [&>span]:text-(--primary)" : "text-black"}`}
-                  >
-                    <Link
-                      href="/dashboard/annual-investment-plan"
-                      className="flex items-center justify-center gap-2"
-                    >
-                      {isLead ? (
-                        "Workspace"
-                      ) : (
-                        <>
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
+                    {!isLead ? (
+                      <li
+                        className={`h-full group ${pathname === "/dashboard" ? "border-b-2 border-b-(--primary) text-(--foreground)" : "text-(--foreground)"}`}
+                      >
+                        <Link
+                          href="/dashboard"
+                          className="flex items-center justify-center gap-2"
+                        >
+                          <IconHome
                             width={16}
                             className="stroke-(--foreground) group-hover:stroke-(--primary)"
-                          >
-                            <path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
-                            <path d="M22 12A10 10 0 0 0 12 2v10z"></path>
-                          </svg>
-                          <span>Annual Investment Plan</span>
-                        </>
-                      )}
-                    </Link>
-                  </li>
-                  {!isLead ? (
-                    <li
-                      className={`h-full group ${pathname === "/dashboard" ? "border-b-2 border-b-(--primary) text-(--foreground)" : "text-(--foreground)"}`}
-                    >
-                      <Link
-                        href="/dashboard"
-                        className="flex items-center justify-center gap-2"
-                      >
-                        <IconHome
-                          width={16}
-                          className="stroke-(--foreground) group-hover:stroke-(--primary)"
-                        />
-                        Home
-                      </Link>
-                    </li>
-                  ) : null}
-                </>
-              )}
-            </ul>
+                          />
+                          Home
+                        </Link>
+                      </li>
+                    ) : null}
+                  </>
+                )}
+              </ul>
+            )}
             <ul className="flex items-center h-full mr-6 gap-6">
               {isSuperadmin ? (
                 <li className="flex items-center h-full">

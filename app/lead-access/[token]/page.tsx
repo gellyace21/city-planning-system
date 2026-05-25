@@ -104,10 +104,12 @@ export default function LeadAccessPage(): React.JSX.Element {
       <style jsx>{`
         .lead-access-root {
           width: min(480px, 92vw);
-          background: #ffffff;
+          background: var(--card);
+          color: var(--foreground);
           border-radius: 16px;
-          box-shadow: 0 8px 32px rgba(74, 158, 127, 0.2);
-          border: 1px solid #d6f0e4;
+          box-shadow: 0 8px 32px
+            color-mix(in srgb, var(--primary) 18%, transparent);
+          border: 1px solid var(--border);
           padding: 28px 24px;
           font-family: "Lato", sans-serif;
           margin-top: 14rem;
@@ -115,22 +117,22 @@ export default function LeadAccessPage(): React.JSX.Element {
 
         h1 {
           font-family: "Cinzel", serif;
-          color: #2c4a3a;
+          color: var(--foreground);
           font-size: 1.2rem;
           margin-bottom: 10px;
           letter-spacing: 0.3px;
         }
 
         p {
-          color: #4a7060;
+          color: var(--muted-foreground);
           font-size: 0.95rem;
           margin-bottom: 18px;
         }
 
         .username-chip {
           display: inline-block;
-          background: #e7f6ef;
-          color: #1f5e54;
+          background: var(--secondary);
+          color: var(--secondary-foreground);
           border-radius: 999px;
           padding: 6px 12px;
           font-size: 0.8rem;
@@ -144,27 +146,28 @@ export default function LeadAccessPage(): React.JSX.Element {
           font-size: 0.8rem;
           letter-spacing: 0.06em;
           text-transform: uppercase;
-          color: #5a8070;
+          color: var(--muted-foreground);
           font-weight: 700;
         }
 
         input {
           width: 100%;
           height: 42px;
-          border: 1.5px solid #b9decf;
+          border: 1.5px solid var(--border);
           border-radius: 8px;
           padding: 0 12px;
           outline: none;
           font-size: 0.95rem;
           margin-bottom: 14px;
-          color: #1a3d2e;
-          background: #f8fdfb;
+          color: var(--foreground);
+          background: var(--background);
         }
 
         input:focus {
-          border-color: #4a9e7f;
-          box-shadow: 0 0 0 3px rgba(74, 158, 127, 0.15);
-          background: #ffffff;
+          border-color: var(--primary);
+          box-shadow: 0 0 0 3px
+            color-mix(in srgb, var(--primary) 18%, transparent);
+          background: var(--card);
         }
 
         .btn {
@@ -172,8 +175,8 @@ export default function LeadAccessPage(): React.JSX.Element {
           height: 42px;
           border: none;
           border-radius: 8px;
-          background: linear-gradient(90deg, #3d8f6e 0%, #55b38a 100%);
-          color: #ffffff;
+          background: var(--primary);
+          color: var(--primary-foreground);
           font-weight: 700;
           font-size: 0.9rem;
           cursor: pointer;
@@ -186,13 +189,38 @@ export default function LeadAccessPage(): React.JSX.Element {
         }
 
         .error {
-          color: #b63b3b;
-          background: #fef0f0;
-          border: 1px solid #f6d3d3;
+          color: var(--destructive);
+          background: color-mix(
+            in srgb,
+            var(--destructive) 12%,
+            var(--background)
+          );
+          border: 1px solid
+            color-mix(in srgb, var(--destructive) 30%, var(--border));
           border-radius: 8px;
           padding: 10px 12px;
           margin-bottom: 14px;
           font-size: 0.88rem;
+        }
+
+        select {
+          width: 100%;
+          height: 42px;
+          border: 1.5px solid var(--border);
+          border-radius: 8px;
+          padding: 0 12px;
+          outline: none;
+          font-size: 0.95rem;
+          margin-bottom: 14px;
+          color: var(--foreground);
+          background: var(--background);
+        }
+
+        select:focus {
+          border-color: var(--primary);
+          box-shadow: 0 0 0 3px
+            color-mix(in srgb, var(--primary) 18%, transparent);
+          background: var(--card);
         }
       `}</style>
 

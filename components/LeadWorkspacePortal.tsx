@@ -192,12 +192,13 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
           width: 100%;
           min-height: 100vh;
           margin-top: 2rem;
-          background: #e8f8f2;
+          background: var(--background);
+          color: var(--foreground);
           font-family: var(--font-sans), sans-serif;
         }
 
         .workspace-header {
-          background: #2a7a5a;
+          background: var(--primary);
           padding: 0 28px;
           height: 52px;
           display: flex;
@@ -210,13 +211,13 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
           width: 38px;
           height: 38px;
           border-radius: 50%;
-          background: #ffffff;
+          background: var(--card);
           display: flex;
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
           overflow: hidden;
-          border: 2px solid #34a475;
+          border: 2px solid var(--border);
         }
 
         .header-logo img {
@@ -229,7 +230,7 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
           font-family: var(--font-montserrat), sans-serif;
           font-size: 13px;
           font-weight: 700;
-          color: #ffffff;
+          color: var(--primary-foreground);
           letter-spacing: 1.5px;
           text-transform: uppercase;
         }
@@ -244,7 +245,7 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
           font-family: var(--font-montserrat), sans-serif;
           font-size: 22px;
           font-weight: 700;
-          color: #1a3a2a;
+          color: var(--foreground);
           text-align: center;
           letter-spacing: 2px;
           text-transform: uppercase;
@@ -269,18 +270,18 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
         .field-group label {
           font-size: 14px;
           font-weight: 600;
-          color: #1a3a2a;
+          color: var(--foreground);
         }
 
         .field-group input,
         .field-group select {
           height: 34px;
           padding: 0 10px;
-          border: 1.5px solid #b2dece;
+          border: 1.5px solid var(--border);
           border-radius: 6px;
-          background: #ffffff;
+          background: var(--card);
           font-size: 14px;
-          color: #1a3a2a;
+          color: var(--foreground);
           outline: none;
           cursor: pointer;
           transition: border-color 0.2s;
@@ -288,33 +289,34 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
 
         .field-group input:focus,
         .field-group select:focus {
-          border-color: #34a475;
-          box-shadow: 0 0 0 3px rgba(52, 164, 117, 0.13);
+          border-color: var(--primary);
+          box-shadow: 0 0 0 3px
+            color-mix(in srgb, var(--primary) 16%, transparent);
         }
 
         .card {
-          background: #ffffff;
-          border: 1.5px solid #b2dece;
+          background: var(--card);
+          border: 1.5px solid var(--border);
           border-radius: 12px;
           padding: 28px 30px;
           margin-bottom: 20px;
-          box-shadow: 0 2px 12px rgba(42, 122, 90, 0.1);
+          box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
         }
 
         .card-label {
           font-size: 15px;
           font-weight: 600;
-          color: #1a3a2a;
+          color: var(--foreground);
           margin-bottom: 16px;
         }
 
         .file-upload-row {
           display: flex;
           align-items: center;
-          border: 1.5px solid #b2dece;
+          border: 1.5px solid var(--border);
           border-radius: 8px;
           overflow: hidden;
-          background: #ffffff;
+          background: var(--background);
         }
 
         .btn-choose {
@@ -322,8 +324,8 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
           display: flex;
           justify-content: center;
           align-items: center;
-          background: #2a7a5a;
-          color: #ffffff;
+          background: var(--secondary);
+          color: var(--secondary-foreground);
           border: none;
           padding: 0 20px;
           height: 42px;
@@ -338,13 +340,13 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
         }
 
         .btn-choose:hover {
-          background: #34a475;
+          filter: brightness(1.03);
         }
 
         .file-name-display {
           padding: 0 16px;
           font-size: 14px;
-          color: #6b9e88;
+          color: var(--muted-foreground);
           flex: 1;
           white-space: nowrap;
           overflow: hidden;
@@ -358,8 +360,8 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
         }
 
         .btn-upload {
-          background: #34a475;
-          color: #ffffff;
+          background: var(--primary);
+          color: var(--primary-foreground);
           border: none;
           padding: 10px 30px;
           border-radius: 8px;
@@ -374,13 +376,13 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
         }
 
         .btn-upload:hover {
-          background: #2a7a5a;
+          filter: brightness(1.03);
           transform: translateY(-1px);
         }
 
         .btn-upload:disabled {
-          background: #b2dece;
-          color: #6b9e88;
+          background: var(--muted);
+          color: var(--muted-foreground);
           cursor: not-allowed;
           transform: none;
         }
@@ -391,11 +393,11 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
         }
 
         .helper.error {
-          color: #b42318;
+          color: var(--destructive);
         }
 
         .helper.success {
-          color: #1d6e4b;
+          color: var(--primary);
         }
 
         .uploaded-card {
@@ -405,7 +407,7 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
         .empty-state {
           text-align: center;
           padding: 36px 0 20px;
-          color: #6b9e88;
+          color: var(--muted-foreground);
           font-size: 14px;
           font-style: italic;
         }
@@ -425,9 +427,11 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
           letter-spacing: 0.4px;
           border-radius: 999px;
           padding: 6px 14px;
-          border: 1px solid;
+          border: 1px solid var(--border);
           margin: -12px auto 24px;
           width: fit-content;
+          background: var(--secondary);
+          color: var(--secondary-foreground);
         }
 
         .file-item {
@@ -436,8 +440,8 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
           align-items: center;
           gap: 12px;
           padding: 10px 14px;
-          background: #e8f8f2;
-          border: 1px solid #b2dece;
+          background: var(--card);
+          border: 1px solid var(--border);
           border-radius: 8px;
           transition:
             transform 0.14s ease,
@@ -447,8 +451,9 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
 
         .file-item:hover {
           transform: translateY(-1px);
-          border-color: #2a7a5a;
-          box-shadow: 0 8px 20px rgba(42, 122, 90, 0.16);
+          border-color: var(--primary);
+          box-shadow: 0 8px 20px
+            color-mix(in srgb, var(--primary) 16%, transparent);
         }
 
         .file-main {
@@ -471,13 +476,13 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
         .file-icon {
           width: 32px;
           height: 32px;
-          background: #2a7a5a;
+          background: var(--primary);
           border-radius: 6px;
           display: flex;
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
-          color: #ffffff;
+          color: var(--primary-foreground);
           font-size: 14px;
           font-weight: 700;
         }
@@ -490,7 +495,7 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
         .file-info-name {
           font-size: 14px;
           font-weight: 600;
-          color: #1a3a2a;
+          color: var(--foreground);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -498,7 +503,7 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
 
         .file-info-meta {
           font-size: 12px;
-          color: #6b9e88;
+          color: var(--muted-foreground);
           margin-top: 2px;
         }
 
@@ -510,10 +515,10 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
         }
 
         .file-action-btn {
-          border: 1px solid #cbe7db;
+          border: 1px solid var(--border);
           border-radius: 999px;
-          background: #ffffff;
-          color: #2a7a5a;
+          background: var(--card);
+          color: var(--primary);
           font-size: 11px;
           font-weight: 700;
           padding: 6px 10px;
@@ -523,13 +528,13 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
         }
 
         .file-action-btn:hover {
-          background: #f1faf6;
+          background: var(--muted);
         }
 
         .file-action-btn:disabled {
           opacity: 0.6;
           cursor: not-allowed;
-          background: #f3f4f6;
+          background: var(--muted);
         }
 
         .file-status {
@@ -544,33 +549,49 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
         }
 
         .file-status.draft {
-          background: #fff7ed;
-          color: #9a3412;
-          border-color: #fdba74;
+          background: color-mix(
+            in srgb,
+            var(--secondary) 70%,
+            var(--background)
+          );
+          color: var(--secondary-foreground);
+          border-color: var(--border);
         }
 
         .file-status.submitted {
-          background: #e7f6ef;
-          color: #1d6e4b;
-          border-color: #a6d5c1;
+          background: color-mix(in srgb, var(--primary) 14%, var(--background));
+          color: var(--primary);
+          border-color: var(--border);
         }
 
         .file-action-btn.danger {
-          border-color: #f2b8b5;
-          color: #b42318;
-          background: #fff7f7;
+          border-color: color-mix(
+            in srgb,
+            var(--destructive) 35%,
+            var(--border)
+          );
+          color: var(--destructive);
+          background: color-mix(
+            in srgb,
+            var(--destructive) 10%,
+            var(--background)
+          );
         }
 
         .file-action-btn.danger:hover {
-          background: #fdecec;
+          background: color-mix(
+            in srgb,
+            var(--destructive) 14%,
+            var(--background)
+          );
         }
 
         .edit-hint {
           padding: 4px 10px;
           border-radius: 999px;
-          border: 1px solid #9cd6be;
-          background: #ffffff;
-          color: #2a7a5a;
+          border: 1px solid var(--border);
+          background: var(--card);
+          color: var(--primary);
           font-size: 11px;
           font-weight: 700;
           letter-spacing: 0.3px;
@@ -591,7 +612,7 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
         .modal-backdrop {
           position: fixed;
           inset: 0;
-          background: rgba(0, 0, 0, 0.3);
+          background: color-mix(in srgb, var(--foreground) 30%, transparent);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -600,12 +621,13 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
         }
 
         .modal-card {
-          background: #ffffff;
-          border: 1px solid #e5e7eb;
+          background: var(--card);
+          border: 1px solid var(--border);
           border-radius: 16px;
           max-width: 560px;
           width: 100%;
-          box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18);
+          box-shadow: 0 20px 40px
+            color-mix(in srgb, var(--foreground) 18%, transparent);
         }
 
         .modal-header {
@@ -613,7 +635,7 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
           align-items: center;
           justify-content: space-between;
           padding: 18px 20px;
-          border-bottom: 1px solid #e5e7eb;
+          border-bottom: 1px solid var(--border);
         }
 
         .modal-body {
@@ -623,24 +645,24 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
         .comment-thread {
           max-height: 260px;
           overflow: auto;
-          border: 1px solid #f0f2f4;
+          border: 1px solid var(--border);
           border-radius: 12px;
         }
 
         .comment-item {
           padding: 12px 14px;
-          border-bottom: 1px solid #f0f2f4;
+          border-bottom: 1px solid var(--border);
         }
 
         .comment-meta {
           font-size: 12px;
-          color: #6b7280;
+          color: var(--muted-foreground);
           margin-bottom: 6px;
         }
 
         .comment-text {
           font-size: 13px;
-          color: #1f2937;
+          color: var(--foreground);
           white-space: pre-wrap;
         }
 
@@ -648,7 +670,7 @@ export default function LeadWorkspacePortal(): React.JSX.Element {
           padding: 20px;
           text-align: center;
           font-size: 13px;
-          color: #9ca3af;
+          color: var(--muted-foreground);
         }
 
         @media (max-width: 640px) {

@@ -21,10 +21,12 @@
   - Monitoring and AIP are different formats
   - **Solution:**
 - [x] ProjTables - change submitted, draft to complete, incomplete
-- [ ] add super admin login bg gradient
+- [ ] add super admin login bg gradient (exactly like admin login)
 - [ ] Add lead links manager icons to buttons
 - [ ] Add loading states
 - [ ] Fix print to output the XLSX; not the website view
+- [ ] Add dark mode to lead bg
+- [ ] Add department before generating a link
 
 ## External
 

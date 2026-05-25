@@ -3,6 +3,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { departmentOptions, getDepartmentTheme } from "@/lib/leadDepartments";
+import {
+  IconCopy,
+  IconLoader2,
+  IconPlus,
+  IconRefresh,
+  IconTrash,
+} from "@tabler/icons-react";
 
 type GeneratedLink = {
   id: number;
@@ -38,6 +45,7 @@ export default function LeadLinksManager({
   );
 
   const [linkValue, setLinkValue] = useState("");
+  const [selectedDepartment, setSelectedDepartment] = useState("General");
   const [departmentFilter, setDepartmentFilter] = useState("All");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [generatedLinks, setGeneratedLinks] = useState<GeneratedLink[]>([]);
@@ -53,6 +61,7 @@ export default function LeadLinksManager({
     null,
   );
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [isLoadingLinks, setIsLoadingLinks] = useState(false);
 
   const groupedLinks = useMemo(() => {
     return generatedLinks.reduce(
@@ -102,6 +111,7 @@ export default function LeadLinksManager({
     if (!isAdminView) return;
 
     try {
+      setIsLoadingLinks(true);
       const response = await fetch("/api/lead-links", {
         method: "GET",
         credentials: "same-origin",
@@ -155,6 +165,8 @@ export default function LeadLinksManager({
       setLinkError(
         error instanceof Error ? error.message : "Failed to load lead links",
       );
+    } finally {
+      setIsLoadingLinks(false);
     }
   };
 
@@ -183,7 +195,7 @@ export default function LeadLinksManager({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({}),
+        body: JSON.stringify({ department: selectedDepartment }),
       });
 
       const data = await response.json();
@@ -217,7 +229,7 @@ export default function LeadLinksManager({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ leadId }),
+        body: JSON.stringify({ leadId, department: selectedDepartment }),
       });
 
       const data = await response.json();
@@ -371,6 +383,10 @@ export default function LeadLinksManager({
         }
 
         .generate-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
           height: 36px;
           border: none;
           border-radius: 8px;
@@ -393,6 +409,17 @@ export default function LeadLinksManager({
         .generate-btn:disabled {
           opacity: 0.65;
           cursor: not-allowed;
+        }
+
+        .btn-content,
+        .status-content {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .spin {
+          animation: spin 0.9s linear infinite;
         }
 
         .link-combined {
@@ -453,6 +480,10 @@ export default function LeadLinksManager({
         }
 
         .copy-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
           border: none;
           border-radius: 6px;
           background: #e8f4ef;
@@ -480,6 +511,35 @@ export default function LeadLinksManager({
           font-size: 11.5px;
           color: #7aa898;
           letter-spacing: 0.3px;
+        }
+
+        .department-picker {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          flex-wrap: wrap;
+          padding: 6px 10px 2px;
+        }
+
+        .department-label {
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          color: #4a7060;
+        }
+
+        .department-select {
+          min-width: 180px;
+          height: 34px;
+          border: 1px solid #c9e5d8;
+          border-radius: 8px;
+          padding: 0 10px;
+          background: #ffffff;
+          color: #2c4a3a;
+          font-size: 12px;
         }
 
         .generated-list {
@@ -789,6 +849,29 @@ export default function LeadLinksManager({
           background: #fdfefe;
         }
 
+        .loading-state {
+          width: 100%;
+          padding: 14px;
+          border: 1px dashed var(--background);
+          border-radius: 10px;
+          background: var(--background-plain);
+          color: #426457;
+          font-size: 12px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+
+        @keyframes spin {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
         @media (max-width: 640px) {
           .lead-row,
           .link-row {
@@ -822,7 +905,13 @@ export default function LeadLinksManager({
             onClick={handleGenerateLink}
             disabled={!canGenerate}
           >
-            {linkLoading ? "Generating..." : "Generate Lead Link"}
+            {linkLoading ? (
+              "Generating..."
+            ) : (
+              <span className="btn-content">
+                <IconPlus size={14} /> Generate Lead Link
+              </span>
+            )}
           </button>
         </div>
 
@@ -832,21 +921,7 @@ export default function LeadLinksManager({
           onClick={handleRefresh}
           title="Refresh"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="23 4 23 10 17 10" />
-            <polyline points="1 20 1 14 7 14" />
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-          </svg>
+          <IconRefresh size={18} />
         </button>
 
         <button
@@ -855,8 +930,26 @@ export default function LeadLinksManager({
           onClick={() => handleCopyLink(linkValue)}
           disabled={!linkValue}
         >
-          Copy
+          <IconCopy size={14} /> Copy
         </button>
+      </div>
+
+      <div className="department-picker">
+        <label htmlFor="lead-department-select" className="department-label">
+          Department before generating
+        </label>
+        <select
+          id="lead-department-select"
+          className="department-select"
+          value={selectedDepartment}
+          onChange={(e) => setSelectedDepartment(e.target.value)}
+        >
+          {departmentOptions.map((department) => (
+            <option key={department} value={department}>
+              {department}
+            </option>
+          ))}
+        </select>
       </div>
 
       {linkMessage ? (
@@ -870,7 +963,11 @@ export default function LeadLinksManager({
         Generate a link for Implementation Levels
       </span>
 
-      {generatedLinks.length > 0 ? (
+      {isLoadingLinks && generatedLinks.length === 0 ? (
+        <div className="loading-state">
+          <IconLoader2 size={14} className="spin" /> Loading lead links...
+        </div>
+      ) : generatedLinks.length > 0 ? (
         <div className="generated-list bg-(--muted-card)">
           <div className="generated-title">Generated Links by Department</div>
           <div className="generated-controls">
@@ -938,7 +1035,10 @@ export default function LeadLinksManager({
                           entry.lead_department || department,
                         );
                         return (
-                          <div className="generated-item" key={entry.id}>
+                          <div
+                            className="generated-item"
+                            key={`list-${entry.url || `lead-${entry.lead_id}`}-${entry.id}`}
+                          >
                             <div className="generated-meta">
                               <div className="flex items-center gap-2">
                                 {entry.lead_profile_pic ? (
@@ -995,7 +1095,7 @@ export default function LeadLinksManager({
                                   className="copy-btn"
                                   onClick={() => handleCopyLink(entry.url)}
                                 >
-                                  Copy Link
+                                  <IconCopy size={14} /> Copy Link
                                 </button>
                               ) : (
                                 <button
@@ -1006,9 +1106,16 @@ export default function LeadLinksManager({
                                   }
                                   disabled={generatingLeadId === entry.lead_id}
                                 >
-                                  {generatingLeadId === entry.lead_id
-                                    ? "Generating..."
-                                    : "Generate link"}
+                                  {generatingLeadId === entry.lead_id ? (
+                                    <span className="btn-content">
+                                      <IconLoader2 size={14} className="spin" />
+                                      Generating...
+                                    </span>
+                                  ) : (
+                                    <span className="btn-content">
+                                      <IconPlus size={14} /> Generate link
+                                    </span>
+                                  )}
                                 </button>
                               )}
                               <button
@@ -1016,7 +1123,7 @@ export default function LeadLinksManager({
                                 className="delete-btn"
                                 onClick={() => setPendingDelete(entry)}
                               >
-                                Delete Lead
+                                <IconTrash size={14} /> Delete Lead
                               </button>
                             </div>
 
@@ -1066,7 +1173,10 @@ export default function LeadLinksManager({
                   entry.lead_department || "General",
                 );
                 return (
-                  <div className="generated-card" key={entry.id}>
+                  <div
+                    className="generated-card"
+                    key={`grid-${entry.url || `lead-${entry.lead_id}`}-${entry.id}`}
+                  >
                     <div className="generated-card-head">
                       <div className="flex items-center gap-2 min-w-0">
                         {entry.lead_profile_pic ? (
@@ -1125,7 +1235,7 @@ export default function LeadLinksManager({
                           className="copy-btn"
                           onClick={() => handleCopyLink(entry.url)}
                         >
-                          Copy Link
+                          <IconCopy size={14} /> Copy Link
                         </button>
                       ) : (
                         <button
@@ -1134,9 +1244,16 @@ export default function LeadLinksManager({
                           onClick={() => handleGenerateForLead(entry.lead_id)}
                           disabled={generatingLeadId === entry.lead_id}
                         >
-                          {generatingLeadId === entry.lead_id
-                            ? "Generating..."
-                            : "Generate link"}
+                          {generatingLeadId === entry.lead_id ? (
+                            <span className="btn-content">
+                              <IconLoader2 size={14} className="spin" />
+                              Generating...
+                            </span>
+                          ) : (
+                            <span className="btn-content">
+                              <IconPlus size={14} /> Generate link
+                            </span>
+                          )}
                         </button>
                       )}
                       <button
@@ -1144,7 +1261,7 @@ export default function LeadLinksManager({
                         className="delete-btn"
                         onClick={() => setPendingDelete(entry)}
                       >
-                        Delete Lead
+                        <IconTrash size={14} /> Delete Lead
                       </button>
                     </div>
 

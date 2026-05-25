@@ -42,21 +42,12 @@ export default function LeadLogin(): React.JSX.Element {
 
       <style jsx>{`
         .fp2-root {
-          --green-dark: #2e7d62;
-          --green-mid: #4caf8a;
-          --green-light: #b2dfcf;
-          --green-bg: #d4ede3;
-          --green-pale: #e8f5ee;
-          --white: #ffffff;
-          --text-dark: #1a3d2e;
-          --text-muted: #5a8070;
-          --input-border: #a8d0bf;
-
           min-height: calc(100vh - 84px);
           display: flex;
           width: 100%;
           flex-direction: column;
-          background: var(--green-bg);
+          background: var(--background);
+          color: var(--foreground);
           font-family: "Lato", sans-serif;
         }
 
@@ -64,7 +55,7 @@ export default function LeadLogin(): React.JSX.Element {
           width: 36px;
           height: 36px;
           border-radius: 50%;
-          background: var(--white);
+          background: var(--card);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -84,7 +75,7 @@ export default function LeadLogin(): React.JSX.Element {
           font-size: 13px;
           letter-spacing: 1.5px;
           text-transform: uppercase;
-          color: var(--white);
+          color: var(--foreground);
         }
 
         .fp2-main {
@@ -97,7 +88,7 @@ export default function LeadLogin(): React.JSX.Element {
         }
 
         .card {
-          background: var(--white);
+          background: var(--card);
           border-radius: 16px;
           box-shadow:
             0 8px 40px rgba(46, 125, 98, 0.15),
@@ -120,14 +111,14 @@ export default function LeadLogin(): React.JSX.Element {
           justify-content: center;
           justify-self: flex-end;
           z-index: 1;
-          background: #eaffee;
+          background: var(--card);
         }
 
         .seal-wrap {
           width: 12rem;
           height: 12rem;
           border-radius: 50%;
-          border: 3px solid var(--green-light);
+          border: 3px solid var(--border);
           margin-bottom: 16px;
           overflow: hidden;
           box-shadow: 0 4px 14px rgba(76, 175, 138, 0.2);
@@ -136,13 +127,13 @@ export default function LeadLogin(): React.JSX.Element {
         .welcome-title {
           font-family: "Playfair Display", serif;
           font-size: 30px;
-          color: var(--text-dark);
+          color: var(--foreground);
           margin-bottom: 4px;
         }
 
         .welcome-sub {
           font-size: 13px;
-          color: var(--text-muted);
+          color: var(--muted-foreground);
           margin-bottom: 28px;
         }
 
@@ -165,18 +156,19 @@ export default function LeadLogin(): React.JSX.Element {
         .form-group input {
           width: 50%;
           padding: 11px 14px;
-          border: 1.5px solid var(--input-border);
+          border: 1.5px solid var(--border);
           border-radius: 8px;
           font-size: 13px;
-          color: var(--text-dark);
-          background: var(--green-pale);
+          color: var(--foreground);
+          background: var(--background);
           outline: none;
         }
 
         .form-group input:focus {
-          border-color: var(--green-mid);
-          box-shadow: 0 0 0 3px rgba(76, 175, 138, 0.15);
-          background: var(--white);
+          border-color: var(--primary);
+          box-shadow: 0 0 0 3px
+            color-mix(in srgb, var(--primary) 18%, transparent);
+          background: var(--card);
         }
 
         .btn-login {
@@ -184,25 +176,26 @@ export default function LeadLogin(): React.JSX.Element {
           padding: 11px;
           margin-top: 6px;
           justify-self: center;
-          background: var(--green-dark);
-          color: var(--white);
+          background: var(--primary);
+          color: var(--primary-foreground);
           border: none;
           border-radius: 8px;
           font-size: 14px;
           font-weight: 700;
           letter-spacing: 1px;
           cursor: pointer;
-          box-shadow: 0 4px 12px rgba(46, 125, 98, 0.3);
+          box-shadow: 0 4px 12px
+            color-mix(in srgb, var(--primary) 28%, transparent);
         }
 
         .register-link {
           margin-top: 14px;
           font-size: 12px;
-          color: var(--text-muted);
+          color: var(--muted-foreground);
         }
 
         .register-link a {
-          color: var(--green-dark);
+          color: var(--primary);
           font-weight: 700;
           text-decoration: none;
         }
@@ -215,7 +208,7 @@ export default function LeadLogin(): React.JSX.Element {
           flex: 1;
           justify-content: center;
           overflow: hidden;
-          background: url("images/city-hall.jpg");
+          background: var(--background);
           background-position: center;
           background-size: cover;
         }
@@ -233,20 +226,15 @@ export default function LeadLogin(): React.JSX.Element {
 
         .panel-overlay {
           border-image: fill 0
-            linear-gradient(
-              rgba(234, 255, 238, 0.45),
-              rgba(234, 255, 238, 0.45)
-            );
+            linear-gradient(rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.08));
         }
 
         .map-svg {
           position: relative;
           z-index: 2;
           width: min(90%, 380px);
-          filter: brightness(1.07) saturate(1.8)
-            drop-shadow(0 12px 28px rgba(0, 70, 70, 0.35)) invert(85%)
-            sepia(10%) saturate(2027%) hue-rotate(137deg) brightness(83%)
-            contrast(81%);
+          filter: brightness(1.04) saturate(1.2)
+            drop-shadow(0 12px 28px rgba(0, 0, 0, 0.18));
           opacity: 90%;
           animation: float 4s ease-in-out infinite;
         }
