@@ -136,7 +136,7 @@ export default function LeadLinksManager({
       }> = data.leads || [];
 
       const existingLeadIds = new Set(
-        apiLinks.map((l: any) => Number(l.lead_id)),
+        apiLinks.map((l: GeneratedLink) => Number(l.lead_id)),
       );
       const placeholderLinks: GeneratedLink[] = apiLeads
         .filter((lead) => !existingLeadIds.has(Number(lead.id)))
