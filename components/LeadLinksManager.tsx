@@ -9,6 +9,9 @@ import {
   IconPlus,
   IconRefresh,
   IconTrash,
+  IconEye,
+  IconEyeMinus,
+  IconEyeOff,
 } from "@tabler/icons-react";
 
 type GeneratedLink = {
@@ -514,13 +517,16 @@ export default function LeadLinksManager({
         }
 
         .department-picker {
-          width: 100%;
+          width: max-content
           display: flex;
+          flex-direction: column;
           align-items: center;
-          justify-content: center;
+          text-align: center;
+          justify-content: start;
           gap: 10px;
           flex-wrap: wrap;
           padding: 6px 10px 2px;
+          margin-bottom: -1.2rem;
         }
 
         .department-label {
@@ -890,7 +896,7 @@ export default function LeadLinksManager({
       <div className="lead-row">
         <div className="link-row">
           <div className="link-combined">
-            <span className="link-label">LINK</span>
+            {/*<span className="link-label">LINK</span>*/}
             <input
               type="text"
               className="link-input"
@@ -913,43 +919,44 @@ export default function LeadLinksManager({
               </span>
             )}
           </button>
+
+          <div className="department-picker">
+            <select
+              id="lead-department-select"
+              className="department-select"
+              value={selectedDepartment}
+              onChange={(e) => setSelectedDepartment(e.target.value)}
+            >
+              {departmentOptions.map((department) => (
+                <option key={department} value={department}>
+                  {department}
+                </option>
+              ))}
+            </select>
+            <label
+              htmlFor="lead-department-select"
+              className="department-label"
+            >
+              Choose Department
+            </label>
+          </div>
+          <button
+            className="refresh-btn"
+            type="button"
+            onClick={handleRefresh}
+            title="Refresh"
+          >
+            <IconRefresh size={18} />
+          </button>
+          <button
+            className="copy-btn"
+            type="button"
+            onClick={() => handleCopyLink(linkValue)}
+            disabled={!linkValue}
+          >
+            <IconCopy size={14} /> Copy
+          </button>
         </div>
-
-        <button
-          className="refresh-btn"
-          type="button"
-          onClick={handleRefresh}
-          title="Refresh"
-        >
-          <IconRefresh size={18} />
-        </button>
-
-        <button
-          className="copy-btn"
-          type="button"
-          onClick={() => handleCopyLink(linkValue)}
-          disabled={!linkValue}
-        >
-          <IconCopy size={14} /> Copy
-        </button>
-      </div>
-
-      <div className="department-picker">
-        <label htmlFor="lead-department-select" className="department-label">
-          Department before generating
-        </label>
-        <select
-          id="lead-department-select"
-          className="department-select"
-          value={selectedDepartment}
-          onChange={(e) => setSelectedDepartment(e.target.value)}
-        >
-          {departmentOptions.map((department) => (
-            <option key={department} value={department}>
-              {department}
-            </option>
-          ))}
-        </select>
       </div>
 
       {linkMessage ? (
@@ -1085,9 +1092,15 @@ export default function LeadLinksManager({
                                   )
                                 }
                               >
-                                {expandedLeadId === entry.lead_id
-                                  ? "Hide Uploaded Files"
-                                  : "View Uploaded Files"}
+                                {expandedLeadId === entry.lead_id ? (
+                                  <span className="flex gap-1 items-center">
+                                    <IconEyeOff size={14} /> Hide Uploaded Files
+                                  </span>
+                                ) : (
+                                  <span className="flex gap-1 items-center">
+                                    <IconEye size={14} /> View Uploaded Files
+                                  </span>
+                                )}
                               </button>
                               {entry.url ? (
                                 <button
@@ -1120,7 +1133,7 @@ export default function LeadLinksManager({
                               )}
                               <button
                                 type="button"
-                                className="delete-btn"
+                                className="delete-btn flex gap-1"
                                 onClick={() => setPendingDelete(entry)}
                               >
                                 <IconTrash size={14} /> Delete Lead

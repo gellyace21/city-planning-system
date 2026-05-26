@@ -280,6 +280,10 @@ export default function SuperadminLogin(): React.JSX.Element {
           border-image: fill 0
             linear-gradient(rgba(220, 255, 238, 0.8), rgba(220, 255, 238, 0.8));
         }
+        .overlay {
+          border-image: fill 0
+            linear-gradient(rgba(220, 255, 238, 0.8), rgba(220, 255, 238, 0.8));
+        }
 
         .map-svg {
           position: relative;

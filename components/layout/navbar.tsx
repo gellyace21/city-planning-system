@@ -103,7 +103,7 @@ const Navbar = () => {
 
   return (
     <header className="w-full h-16 z-50 fixed top-0 left-0 font-josefin">
-      <nav className="h-full w-full flex items-center justify-between bg-(--background-plain) pr-8 pl-8 drop-shadow-md drop-shadow-gray-500:5">
+      <nav className="h-full w-full flex items-center justify-between bg-(--background-plain) px-4 md:px-8 shadow-lg">
         <div
           className="flex items-center hover:cursor-pointer"
           onClick={() => router.push(dashboardTarget)}
@@ -115,7 +115,7 @@ const Navbar = () => {
             width={38}
           />
           <h2
-            className={`uppercase ml-2 text-(--foreground) tracking-widest text-m mt-1`}
+            className={`hidden md:block uppercase ml-2 text-(--foreground) tracking-widest text-m mt-1`}
           >
             City Planning and Development Office
           </h2>
@@ -123,10 +123,10 @@ const Navbar = () => {
 
         {/* List Items */}
         {showNav ? (
-          <div className="flex items-center gap-4 h-full">
+          <div className="flex items-center gap-2 md:gap-4 h-full">
             {!isLead && (
               <ul
-                className={`flex items-center h-8 mr-8 gap-4 [&>li>a]:tracking-widest [&>li]:pb-4 [&>li]:pt-1 [&>li]:px-4 [&>li]:text-(--foreground) [&>li]:hover:border-b-2 [&>li]:hover:border-b-(--primary) [&>li]:hover:text-(--primary) [&>li]:transition [&>li]:duration-100`}
+                className={`flex items-center h-8 mr-2 md:mr-8 gap-2 md:gap-4 whitespace-nowrap [&>li>a]:tracking-widest [&>li]:pb-4 [&>li]:pt-1 [&>li]:px-4 [&>li]:text-(--foreground) [&>li]:hover:border-b-2 [&>li]:hover:border-b-(--primary) [&>li]:hover:text-(--primary) [&>li]:transition [&>li]:duration-100`}
               >
                 {showNavItems && (
                   <>

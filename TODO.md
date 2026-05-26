@@ -1,32 +1,34 @@
 <!-- Preview with Ctrl+Shift+V -->
 
-# Missing Features
-
-- project monitoring export is still not the same design projmonit.xlsx, it is actually corrupted at the moment. Please refer to how AIP did its export but use projmonit.xlsx as the excel sheet format. thank you. The idea is, you first convert proj monit2.xlsx then find the cells you can put the monitoring data in then put it there then parse it again to xlsx from base64 to retain the design but the data changed.
-- Make the project tables spann fully downwards (like how excel is, there is no more add row button, just empty rows to edit)
-
 # Test Credentials
 
 - Admin: admin@example.com 12345678
-- Leads
+- Leads: (requires link)
 - Super Admin: superadmin@example.com superadmin
-  > [!TIP]
+  > [!TIP]+
   > use https://bcrypt-generator.com/ for changing passwords in db
 
 # TODO
 
 ## System
 
+- [ ] Fix print to output the XLSX; not the website view
+- [ ] Put departments inline link generator, reduce link box width
+
+### Done (May 26, 2026)
+
+- [x] add super admin login bg gradient (exactly like admin login)
+
+### Done (May 25, 2026)
+
 - [x] Fix monitoring export (Possible causes below)
   - Monitoring and AIP are different formats
   - **Solution:**
 - [x] ProjTables - change submitted, draft to complete, incomplete
-- [ ] add super admin login bg gradient (exactly like admin login)
-- [ ] Add lead links manager icons to buttons
-- [ ] Add loading states
-- [ ] Fix print to output the XLSX; not the website view
-- [ ] Add dark mode to lead bg
-- [ ] Add department before generating a link
+- [x] Add dark mode to lead bg
+- [x] Add loading state to important parts
+- [x] Add department before generating a link
+- [x] Add lead links manager icons to buttons
 
 ## External
 
