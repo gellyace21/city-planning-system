@@ -14,6 +14,8 @@
 
 - [ ] Fix print to output the XLSX; not the website view
 - [ ] Put departments inline link generator, reduce link box width
+- [ ] _To solve lead upload **submit problem**:_ Identify which AIP fields need to be filled out by Implementation Lead
+  - Alternatively, what fields do Admins need to fill out?
 
 ### Done (May 26, 2026)
 
@@ -32,8 +34,7 @@
 
 ## External
 
-- [ ] _To solve lead upload **submit problem**:_ Identify which AIP fields need to be filled out by Implementation Lead
-  - Alternatively, what fields do Admins need to fill out?
+- None
 
 ### Done (May 25, 2026)
 
