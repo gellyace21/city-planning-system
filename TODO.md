@@ -10,6 +10,16 @@
 
 # TODO
 
+## Final Week
+
+- [x] Create admin button
+- [ ] Replace errors with toast
+  - [x] superadmin
+  - [x] lead links
+  - [ ] profile modal
+- [ ] Add react crop to profile modal
+- [ ] Anchor dashboard to top
+
 ## System
 
 - [ ] Fix print to output the XLSX; not the website view

@@ -13,6 +13,7 @@ import Footer from "../components/layout/footer";
 import Nav from "../components/layout/navbar";
 import { cn } from "@/lib/utils";
 import { AuthProvider } from "./providers";
+import { Toaster } from "react-hot-toast";
 
 // Fonts
 
@@ -87,6 +88,7 @@ export default function RootLayout({
           <Nav />
           <main className="flex min-h-screen flex-col items-center justify-start gap-12 relative mt-6">
             {children}
+            <Toaster position="top-right" />
           </main>
           <Footer />
         </AuthProvider>

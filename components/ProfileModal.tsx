@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import Cropper, { Area } from "react-easy-crop";
 import { useSession } from "next-auth/react";
 
 interface ProfileModalProps {
@@ -19,6 +20,12 @@ export default function ProfileModal({
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [profilePhoto, setProfilePhoto] = useState("");
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [showCropper, setShowCropper] = useState(false);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -43,8 +50,13 @@ export default function ProfileModal({
 
   const fetchProfile = async () => {
     try {
+      setLoading(true);
       const response = await fetch(`/api/profile?id=${currentAdminId}`);
-      if (!response.ok) throw new Error("Failed to fetch profile");
+      if (!response.ok) {
+        const error = await response.text();
+        console.error(response.status, error);
+        throw new Error("Failed to fetch profile");
+      }
 
       const data = await response.json();
       setFullName(data.name || "");
@@ -55,64 +67,130 @@ export default function ProfileModal({
     } catch (err) {
       setError("Failed to load profile");
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const createImage = (url: string) =>
+    new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = (e) => reject(e);
+      img.src = url;
+    });
+
+  const getCroppedImg = async (imageSrcParam: string, pixelCrop: Area) => {
+    const image = await createImage(imageSrcParam);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(pixelCrop.width));
+    canvas.height = Math.max(1, Math.round(pixelCrop.height));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not get canvas context");
+
+    ctx.drawImage(
+      image,
+      Math.round(pixelCrop.x),
+      Math.round(pixelCrop.y),
+      Math.round(pixelCrop.width),
+      Math.round(pixelCrop.height),
+      0,
+      0,
+      Math.round(pixelCrop.width),
+      Math.round(pixelCrop.height),
+    );
+
+    return new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.9);
+    });
+  };
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const upload = async () => {
-        try {
-          setLoading(true);
-          setError("");
+    if (!file) return;
+    // create object URL for cropper preview
+    const url = URL.createObjectURL(file);
+    setSelectedFile(file);
+    setImageSrc(url);
+    setShowCropper(true);
+  };
 
-          const formData = new FormData();
-          formData.append("file", file);
+  const onCropComplete = useCallback(
+    (_: Area, croppedAreaPixelsParam: Area) => {
+      setCroppedAreaPixels(croppedAreaPixelsParam);
+    },
+    [],
+  );
 
-          const response = await fetch("/api/profile/upload", {
-            method: "POST",
-            body: formData,
-          });
+  const handleCropCancel = () => {
+    if (imageSrc) URL.revokeObjectURL(imageSrc);
+    setImageSrc(null);
+    setSelectedFile(null);
+    setShowCropper(false);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setCroppedAreaPixels(null);
+  };
 
-          if (!response.ok) {
-            const uploadError = await response.json().catch(() => null);
-            throw new Error(uploadError?.error || "Failed to upload photo");
-          }
+  const handleCropUpload = async () => {
+    if (!imageSrc || !croppedAreaPixels) return;
+    try {
+      setLoading(true);
+      setError("");
 
-          const data = (await response.json()) as { url?: string };
-          if (data.url) {
-            setProfilePhoto(data.url);
+      const blob = await getCroppedImg(imageSrc, croppedAreaPixels);
+      if (!blob) throw new Error("Failed to create cropped image");
 
-            await update({
-              profile_pic: data.url,
-            });
+      const fileName = selectedFile?.name || `profile-${Date.now()}.jpg`;
+      const croppedFile = new File([blob], fileName, { type: "image/jpeg" });
 
-            if (currentAdminId) {
-              const profileResponse = await fetch(
-                `/api/profile?id=${currentAdminId}`,
-              );
-              if (profileResponse.ok) {
-                const profileData = (await profileResponse.json()) as {
-                  profile_pic?: string;
-                };
-                if (profileData.profile_pic) {
-                  setProfilePhoto(profileData.profile_pic);
-                }
-              }
+      const formData = new FormData();
+      formData.append("file", croppedFile);
+
+      const response = await fetch("/api/profile/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const uploadError = await response.json().catch(() => null);
+        throw new Error(uploadError?.error || "Failed to upload photo");
+      }
+
+      const data = (await response.json()) as { url?: string };
+      if (data.url) {
+        setProfilePhoto(data.url);
+
+        await update({
+          profile_pic: data.url,
+        });
+
+        if (currentAdminId) {
+          const profileResponse = await fetch(
+            `/api/profile?id=${currentAdminId}`,
+          );
+          if (profileResponse.ok) {
+            const profileData = (await profileResponse.json()) as {
+              profile_pic?: string;
+            };
+            if (profileData.profile_pic) {
+              setProfilePhoto(profileData.profile_pic);
             }
           }
-        } catch (uploadError) {
-          setError(
-            uploadError instanceof Error
-              ? uploadError.message
-              : "Failed to upload photo",
-          );
-        } finally {
-          setLoading(false);
         }
-      };
+      }
 
-      void upload();
+      // cleanup
+      handleCropCancel();
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : "Failed to upload photo",
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -542,8 +620,63 @@ export default function ProfileModal({
               id="photoInput"
               style={{ display: "none" }}
               accept="image/*"
-              onChange={handlePhotoUpload}
+              onChange={handleFileSelected}
             />
+
+            {showCropper && imageSrc ? (
+              <div style={{ width: "100%", marginTop: 16 }}>
+                <div
+                  style={{
+                    position: "relative",
+                    width: "100%",
+                    height: 320,
+                    background: "#333",
+                  }}
+                >
+                  <Cropper
+                    image={imageSrc}
+                    crop={crop}
+                    zoom={zoom}
+                    aspect={1}
+                    onCropChange={setCrop}
+                    onZoomChange={setZoom}
+                    onCropComplete={onCropComplete}
+                  />
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    marginTop: 8,
+                    alignItems: "center",
+                  }}
+                >
+                  <label style={{ fontSize: 12, color: "#5a7a76" }}>Zoom</label>
+                  <input
+                    type="range"
+                    min={1}
+                    max={3}
+                    step={0.1}
+                    value={zoom}
+                    onChange={(e) => setZoom(Number(e.target.value))}
+                  />
+                  <button
+                    className="upload-btn"
+                    onClick={handleCropUpload}
+                    disabled={loading}
+                  >
+                    {loading ? "Uploading..." : "Crop & Upload"}
+                  </button>
+                  <button
+                    className="btn-cancel"
+                    onClick={handleCropCancel}
+                    disabled={loading}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -571,26 +704,34 @@ export default function ProfileModal({
                 placeholder="Full Name"
               />
             </div>
-            <div className="form-group">
-              <label htmlFor="phone">Contact</label>
-              <input
-                type="tel"
-                id="phone"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="Phone Number"
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="email">Email</label>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email Address"
-              />
-            </div>
+            {!isLead ? (
+              <>
+                {" "}
+                <div className="form-group">
+                  <label htmlFor="phone">Contact</label>
+                  <input
+                    type="tel"
+                    id="phone"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="Phone Number"
+                  />
+                </div>{" "}
+                <div className="form-group">
+                  <label htmlFor="email">Email</label>
+                  <input
+                    type="email"
+                    id="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Email Address"
+                  />
+                </div>{" "}
+              </>
+            ) : (
+              ""
+            )}
+
             {!isLead ? (
               <>
                 <div

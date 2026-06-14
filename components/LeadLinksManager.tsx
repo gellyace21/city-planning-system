@@ -13,6 +13,8 @@ import {
   IconEyeMinus,
   IconEyeOff,
 } from "@tabler/icons-react";
+import { toast } from "react-hot-toast";
+import { DropdownMenu } from "radix-ui";
 
 type GeneratedLink = {
   id: number;
@@ -65,6 +67,7 @@ export default function LeadLinksManager({
   );
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [isLoadingLinks, setIsLoadingLinks] = useState(false);
+  const [openAddDepartment, setOpenAddDepartment] = useState(false);
 
   const groupedLinks = useMemo(() => {
     return generatedLinks.reduce(
@@ -165,7 +168,7 @@ export default function LeadLinksManager({
       );
       setLeadUploads(grouped);
     } catch (error) {
-      setLinkError(
+      toast.error(
         error instanceof Error ? error.message : "Failed to load lead links",
       );
     } finally {
@@ -207,14 +210,14 @@ export default function LeadLinksManager({
       }
 
       setLinkValue(data.link?.url || "");
-      setLinkMessage(
+      toast.success(
         data.link?.reused
           ? "Existing link reused for this lead."
           : "New secure link generated.",
       );
       await fetchLinks();
     } catch (error) {
-      setLinkError(
+      toast.error(
         error instanceof Error ? error.message : "Failed to generate link",
       );
     } finally {
@@ -241,7 +244,7 @@ export default function LeadLinksManager({
       }
 
       setLinkValue(data.link?.url || "");
-      setLinkMessage(
+      toast.success(
         data.link?.reused
           ? "Existing link reused for this lead."
           : "New secure link generated.",
@@ -271,7 +274,7 @@ export default function LeadLinksManager({
         document.execCommand("copy");
         document.body.removeChild(textarea);
       }
-      setLinkMessage("Link copied to clipboard.");
+      toast.success("Link copied to clipboard.");
     } catch {
       setLinkError("Failed to copy link.");
     }
@@ -292,7 +295,7 @@ export default function LeadLinksManager({
       setPendingDelete(null);
       await fetchLinks();
     } catch (error) {
-      setLinkError(
+      toast.error(
         error instanceof Error ? error.message : "Failed to delete lead.",
       );
     } finally {

@@ -91,7 +91,7 @@ export async function getAdminProfile(adminId: number): Promise<AdminProfile> {
 
 export async function getLeadProfile(leadId: number): Promise<LeadProfile> {
   const rows = (await sql`
-    SELECT id, username, department, created_at, is_active
+    SELECT id, username, department, created_at, is_active, profile_pic
     FROM leads
     WHERE id = ${leadId}
     LIMIT 1
@@ -185,16 +185,21 @@ export async function updateLeadProfile(
     ...updates,
   };
 
+  // Update lead fields. Use COALESCE/preserving behavior similar to admins
   await sql`
     UPDATE leads
     SET
-      username = ${next.username},
-      department = ${next.department ?? null},
-      is_active = ${Boolean(next.is_active)}
+      username = COALESCE(${next.username}, username),
+      department = COALESCE(${next.department ?? null}, department),
+      profile_pic = COALESCE(${next.profile_pic ?? null}, profile_pic),
+      is_active = COALESCE(${typeof next.is_active === "boolean" ? next.is_active : null}, is_active)
     WHERE id = ${leadId}
   `;
 
-  return next;
+  return {
+    ...current,
+    ...next,
+  } as LeadProfile;
 }
 
 export async function updateUserProfileByRole(
@@ -215,7 +220,7 @@ export async function updateUserProfileByRole(
       name: lead.username,
       email: lead.email || "",
       phone: lead.phone || "",
-      profile_pic: "",
+      profile_pic: lead.profile_pic || "",
       department: lead.department || "",
     };
   }

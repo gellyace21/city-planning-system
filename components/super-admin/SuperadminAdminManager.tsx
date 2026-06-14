@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import LeadLinksManager from "@/components/LeadLinksManager";
+import usePassword from "@/hooks/usePassword";
+import toast from "react-hot-toast";
 
 type AdminRecord = {
   id: number;
@@ -20,11 +22,18 @@ export default function SuperadminAdminManager(): React.JSX.Element {
   const [error, setError] = useState<string>("");
   const [name, setName] = useState<string>("");
   const [email, setEmail] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
+  const {
+    value: password,
+    setValue: setPassword,
+    meta,
+    show,
+    toggleShow,
+  } = usePassword("", 8, 64);
   const [profilePic, setProfilePic] = useState<string>("");
   const [isSuperadmin, setIsSuperadmin] = useState<boolean>(false);
   const [pendingDelete, setPendingDelete] = useState<AdminRecord | null>(null);
   const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
+  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
 
   const loadAdmins = async (): Promise<void> => {
     setLoading(true);
@@ -71,15 +80,18 @@ export default function SuperadminAdminManager(): React.JSX.Element {
       const data = (await response.json()) as { error?: string };
       if (!response.ok)
         throw new Error(data.error || "Failed to create account.");
+      // Success at this point
+      toast.success("Admin account created.");
       setName("");
       setEmail("");
       setPassword("");
       setProfilePic("");
       setIsSuperadmin(false);
+      setShowCreateModal(false);
       setActiveTab("manage");
       await loadAdmins();
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error ? err.message : "Failed to create account.",
       );
     }
@@ -174,6 +186,12 @@ export default function SuperadminAdminManager(): React.JSX.Element {
             className={`text-xs font-bold px-4 py-1.5 ${activeTab === "archived" ? "bg-gray-500" : "bg-gray-400"} text-white`}
           >
             ARCHIVED STAFF
+          </button>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="text-xs font-bold px-3 py-1.5 bg-emerald-600 text-white rounded"
+          >
+            ADD STAFF
           </button>
         </div>
 
@@ -378,6 +396,102 @@ export default function SuperadminAdminManager(): React.JSX.Element {
                 {deleteLoading ? "Deleting..." : "Delete account"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Admin Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-xl">
+            <h3 className="text-base font-bold text-gray-900">
+              Create admin account
+            </h3>
+            <form onSubmit={createAdmin} className="mt-4 space-y-3">
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Name"
+                className="w-full px-3 py-2 border rounded"
+              />
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email"
+                className="w-full px-3 py-2 border rounded"
+              />
+              <div className="relative">
+                <input
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password"
+                  type={show ? "text" : "password"}
+                  maxLength={meta.max}
+                  className="w-full px-3 py-2 border rounded"
+                />
+                <button
+                  type="button"
+                  onClick={toggleShow}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-600"
+                >
+                  {show ? "Hide" : "Show"}
+                </button>
+              </div>
+              <div className="mt-2">
+                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div
+                    className={`${meta.valid ? "bg-emerald-600" : "bg-red-500"} h-full transition-all duration-150`}
+                    style={{
+                      width: `${Math.min(100, Math.round((meta.length / meta.max) * 100))}%`,
+                    }}
+                  />
+                </div>
+                <div className="text-xs mt-1 text-gray-500">
+                  <span
+                    className={`${meta.length === 0 ? "text-gray-500" : meta.valid ? "text-emerald-600" : "text-red-500"}`}
+                  >
+                    {meta.length === 0
+                      ? "Please enter a password"
+                      : meta.length < meta.min
+                        ? `(${meta.length}) Password is too short`
+                        : `(${meta.length}) Password is valid`}{" "}
+                    {meta.length < meta.min
+                      ? `(minimum ${meta.min} characters)`
+                      : ""}
+                  </span>
+                </div>
+              </div>
+              <input
+                value={profilePic}
+                onChange={(e) => setProfilePic(e.target.value)}
+                placeholder="Profile pic URL (optional)"
+                className="w-full px-3 py-2 border rounded"
+              />
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={isSuperadmin}
+                  onChange={(e) => setIsSuperadmin(e.target.checked)}
+                />
+                <span className="text-sm">Make super admin</span>
+              </label>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-3 py-2 rounded border"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!meta.valid}
+                  className="px-3 py-2 rounded bg-emerald-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Create
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

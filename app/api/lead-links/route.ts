@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
         gl.id,
         gl.lead_id,
         COALESCE(l.username, '') AS lead_username,
+        COALESCE(l.profile_pic, '') AS lead_profile_pic,
         gl.token,
         gl.created_by_admin,
         gl.created_at,
@@ -75,6 +76,7 @@ export async function GET(request: NextRequest) {
         lf.uploaded_at,
         lf.row_count,
         COALESCE(l.username, '') AS lead_username,
+        COALESCE(l.profile_pic, '') AS lead_profile_pic,
         COALESCE(l.department, 'General') AS lead_department
       FROM lead_files lf
       LEFT JOIN leads l ON l.id = lf.lead_id
@@ -100,7 +102,7 @@ export async function GET(request: NextRequest) {
         ...link,
         lead_username: link.lead_username || `Lead ${link.lead_id}`,
         lead_department: link.lead_department || "General",
-        lead_profile_pic: "",
+        lead_profile_pic: (link as any).lead_profile_pic || "",
         url: `${origin}/lead-access/${link.token}`,
       };
     });
@@ -210,7 +212,10 @@ export async function POST(request: NextRequest) {
         link: {
           ...existing,
           lead_department: lead?.department || "General",
-          lead_profile_pic: "",
+          lead_profile_pic:
+            (
+              await await sql`SELECT profile_pic FROM leads WHERE id = ${lead.id} LIMIT 1`
+            )[0]?.profile_pic || "",
           url: `${origin}/lead-access/${existing.token}`,
           reused: true,
         },
@@ -228,7 +233,10 @@ export async function POST(request: NextRequest) {
         ...newLink,
         lead_username: lead.username || `Lead ${lead.id}`,
         lead_department: lead?.department || "General",
-        lead_profile_pic: "",
+        lead_profile_pic:
+          (
+            await await sql`SELECT profile_pic FROM leads WHERE id = ${lead.id} LIMIT 1`
+          )[0]?.profile_pic || "",
         url: `${origin}/lead-access/${newLink.token}`,
       },
     });
@@ -305,6 +313,26 @@ export async function DELETE(request: NextRequest) {
 
     await sql`
       DELETE FROM generated_links
+      WHERE lead_id = ${targetLeadId}
+    `;
+    await sql`
+      DELETE FROM file_comments
+      WHERE lead_id = ${targetLeadId}
+    `;
+    await sql`
+      DELETE FROM aip_rows
+      WHERE lead_id = ${targetLeadId}
+    `;
+    await sql`
+      DELETE FROM aip_rows
+      WHERE upload_id IN (
+        SELECT id
+        FROM lead_files
+        WHERE lead_id = ${targetLeadId}
+      )
+    `;
+    await sql`
+      DELETE FROM lead_files
       WHERE lead_id = ${targetLeadId}
     `;
     await sql`

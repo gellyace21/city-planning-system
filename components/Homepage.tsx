@@ -17,7 +17,7 @@ export default function Homepage(): React.JSX.Element {
           flex-direction: column;
           align-items: center;
           height: auto;
-          justify-content: center;
+          justify-content: start;
           // background: #eaf7f0;
           width: 100%;
           margin-top: 0;
@@ -267,7 +267,7 @@ export default function Homepage(): React.JSX.Element {
         </section>
       </section>
 
-      <section className="lead-links">
+      <section className="lead-links shadow-md border-2">
         <LeadLinksManager />
       </section>
     </main>
