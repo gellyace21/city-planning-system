@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import { departmentOptions, getDepartmentTheme } from "@/lib/leadDepartments";
+// import { departmentOptions, getDepartmentTheme } from "@/lib/leadDepartments";
 import {
   IconCopy,
   IconLoader2,
@@ -14,7 +14,16 @@ import {
   IconEyeOff,
 } from "@tabler/icons-react";
 import { toast } from "react-hot-toast";
-import { DropdownMenu } from "radix-ui";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "./ui/button";
 
 type GeneratedLink = {
   id: number;
@@ -37,6 +46,29 @@ type LeadUploadedFile = {
   row_count: number;
   lead_username?: string;
   lead_department?: string;
+};
+
+export type LeadDepartmentTheme = {
+  id: number;
+  key: string;
+  label: string;
+  color: {
+    bg: string;
+    text: string;
+    border: string;
+    accent: string;
+  };
+};
+
+const GENERAL_THEME: DepartmentTheme = {
+  id: 0,
+  label: "General",
+  color: {
+    bg: "#f1f5f9",
+    text: "#475569",
+    border: "#e2e8f0",
+    accent: "#64748b",
+  },
 };
 
 export default function LeadLinksManager({
@@ -67,7 +99,44 @@ export default function LeadLinksManager({
   );
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [isLoadingLinks, setIsLoadingLinks] = useState(false);
-  const [openAddDepartment, setOpenAddDepartment] = useState(false);
+
+  // Department Database Fetch
+  const [departmentOptions, setDepartmentOptions] = useState<string[]>([]);
+  const [departments, setDepartments] = useState<LeadDepartmentTheme[]>([]);
+
+  // TODO: Add a fetch for lead_departments
+  const fetchLeadDepartments = async () => {
+    try {
+      // Basic fetch block
+      const res = await fetch("/api/lead-links/departments", {
+        method: "GET", // Uses the get in the route.ts
+        credentials: "same-origin", // ? Clarify same-origin
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to load departments");
+
+      const rows = (Array.isArray(data) ? data : []) as LeadDepartmentTheme[];
+      setDepartments(rows);
+      setDepartmentOptions([
+        "General",
+        ...rows.map((d) => d.label).filter((d) => d && d !== "General"),
+      ]);
+    } catch (err) {
+      setDepartments([]);
+      setDepartmentOptions(["General"]);
+      toast.error("Failed to load departments.");
+    }
+  };
+
+  const getDepartmentTheme = (department?: string): LeadDepartmentTheme => {
+    const value = String(department || "")
+      .trim()
+      .toLowerCase();
+    const match = departments.find(
+      (d) => d.label.trim().toLowerCase() === value,
+    );
+    return match || GENERAL_THEME;
+  };
 
   const groupedLinks = useMemo(() => {
     return generatedLinks.reduce(
@@ -83,13 +152,15 @@ export default function LeadLinksManager({
     );
   }, [generatedLinks]);
 
+  // END OF DEPARTMENT LIST FETCH
+
   const groupedDepartments = useMemo(() => {
-    const available = Object.keys(groupedLinks);
-    const ordered = departmentOptions.filter((dept) =>
+    const available: string[] = Object.keys(groupedLinks);
+    const ordered = departmentOptions.filter((dept: string) =>
       available.includes(dept),
     );
     const extras = available.filter(
-      (dept) => !departmentOptions.includes(dept),
+      (dept: string) => !departmentOptions.includes(dept),
     );
     return [...ordered, ...extras];
   }, [groupedLinks]);
@@ -924,25 +995,20 @@ export default function LeadLinksManager({
           </button>
 
           <div className="department-picker">
-            <select
-              id="lead-department-select"
-              className="department-select"
-              value={selectedDepartment}
-              onChange={(e) => setSelectedDepartment(e.target.value)}
-            >
-              {departmentOptions.map((department) => (
-                <option key={department} value={department}>
-                  {department}
-                </option>
-              ))}
-            </select>
-            <label
-              htmlFor="lead-department-select"
-              className="department-label"
-            >
-              Choose Department
-            </label>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">Select Department</Button>
+              </DropdownMenuTrigger>
+
+              <DropdownMenuContent>
+                <DropdownMenuGroup>
+                  {/* Retrieve from database, map onto DropDownMenuItem */}
+                  {}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
+
           <button
             className="refresh-btn"
             type="button"

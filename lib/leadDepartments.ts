@@ -1,4 +1,5 @@
 export type LeadDepartmentTheme = {
+  id: number;
   key: string;
   label: string;
   color: {
@@ -10,6 +11,7 @@ export type LeadDepartmentTheme = {
 };
 
 const GENERAL_DEPARTMENT: LeadDepartmentTheme = {
+  id: 1,
   key: "general",
   label: "General",
   color: {
@@ -22,6 +24,7 @@ const GENERAL_DEPARTMENT: LeadDepartmentTheme = {
 
 export const LEAD_DEPARTMENTS: LeadDepartmentTheme[] = [
   {
+    id: 2,
     key: "city-planning-and-development-office",
     label: "City Planning and Development Office",
     color: {
@@ -32,6 +35,7 @@ export const LEAD_DEPARTMENTS: LeadDepartmentTheme[] = [
     },
   },
   {
+    id: 3,
     key: "city-engineering-office",
     label: "City Engineering Office",
     color: {
@@ -42,6 +46,7 @@ export const LEAD_DEPARTMENTS: LeadDepartmentTheme[] = [
     },
   },
   {
+    id: 4,
     key: "city-health-office",
     label: "City Health Office",
     color: {
@@ -52,6 +57,7 @@ export const LEAD_DEPARTMENTS: LeadDepartmentTheme[] = [
     },
   },
   {
+    id: 5,
     key: "city-social-welfare-and-development-office",
     label: "City Social Welfare and Development Office",
     color: {
@@ -62,6 +68,7 @@ export const LEAD_DEPARTMENTS: LeadDepartmentTheme[] = [
     },
   },
   {
+    id: 6,
     key: "city-budget-office",
     label: "City Budget Office",
     color: {
@@ -72,6 +79,7 @@ export const LEAD_DEPARTMENTS: LeadDepartmentTheme[] = [
     },
   },
   {
+    id: 7,
     key: "city-accounting-office",
     label: "City Accounting Office",
     color: {
@@ -82,6 +90,7 @@ export const LEAD_DEPARTMENTS: LeadDepartmentTheme[] = [
     },
   },
   {
+    id: 8,
     key: "city-treasurers-office",
     label: "City Treasurer's Office",
     color: {
@@ -92,6 +101,7 @@ export const LEAD_DEPARTMENTS: LeadDepartmentTheme[] = [
     },
   },
   {
+    id: 9,
     key: "city-assessors-office",
     label: "City Assessor's Office",
     color: {
@@ -102,6 +112,7 @@ export const LEAD_DEPARTMENTS: LeadDepartmentTheme[] = [
     },
   },
   {
+    id: 10,
     key: "city-environment-and-natural-resources-office",
     label: "City Environment and Natural Resources Office",
     color: {
@@ -112,6 +123,7 @@ export const LEAD_DEPARTMENTS: LeadDepartmentTheme[] = [
     },
   },
   {
+    id: 11,
     key: "city-disaster-risk-reduction-and-management-office",
     label: "City Disaster Risk Reduction and Management Office",
     color: {
@@ -122,6 +134,7 @@ export const LEAD_DEPARTMENTS: LeadDepartmentTheme[] = [
     },
   },
   {
+    id: 12,
     key: "city-agriculture-office",
     label: "City Agriculture Office",
     color: {
@@ -132,6 +145,7 @@ export const LEAD_DEPARTMENTS: LeadDepartmentTheme[] = [
     },
   },
   {
+    id: 13,
     key: "business-permits-and-licensing-office",
     label: "Business Permits and Licensing Office",
     color: {
@@ -145,7 +159,9 @@ export const LEAD_DEPARTMENTS: LeadDepartmentTheme[] = [
 ];
 
 const normalize = (value?: string): string =>
-  String(value ?? "").trim().toLowerCase();
+  String(value ?? "")
+    .trim()
+    .toLowerCase();
 
 export const getDepartmentTheme = (
   department?: string,
@@ -153,7 +169,8 @@ export const getDepartmentTheme = (
   const normalized = normalize(department);
   const match = LEAD_DEPARTMENTS.find(
     (entry) =>
-      normalize(entry.label) === normalized || normalize(entry.key) === normalized,
+      normalize(entry.label) === normalized ||
+      normalize(entry.key) === normalized,
   );
   return match ?? GENERAL_DEPARTMENT;
 };
@@ -161,6 +178,4 @@ export const getDepartmentTheme = (
 export const getDepartmentLabel = (department?: string): string =>
   getDepartmentTheme(department).label;
 
-export const departmentOptions = LEAD_DEPARTMENTS.map(
-  (entry) => entry.label,
-);
+export const departmentOptions = LEAD_DEPARTMENTS.map((entry) => entry.label);
