@@ -50,7 +50,6 @@ type LeadUploadedFile = {
 
 export type LeadDepartmentTheme = {
   id: number;
-  key: string;
   label: string;
   color: {
     bg: string;
@@ -60,7 +59,7 @@ export type LeadDepartmentTheme = {
   };
 };
 
-const GENERAL_THEME: DepartmentTheme = {
+const GENERAL_THEME: LeadDepartmentTheme = {
   id: 0,
   label: "General",
   color: {
